@@ -8,6 +8,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.2] - 2026-09-06
+
+### Changed
+
+- Renamed the product from QuotaPulse to **QuotaMew**.
+- Renamed the Xcode project, application and test targets, schemes, Swift modules, and related source directories to the QuotaMew product name.
+- Updated current user-facing application text, documentation, repository references, and public branding for QuotaMew.
+- Updated the official documentation website to `https://quotamew.yincheng.app`.
+- Updated the main project repository to `YinCheng0106/QuotaMew` and the documentation repository to `YinCheng0106/quotamew-docs`.
+- Preserved existing compatibility-sensitive application identifiers so upgrades from QuotaPulse Beta 1 continue to use the same macOS application identity.
+
+### Compatibility
+
+- Production and development bundle identifiers continue to use the existing `dev.quotapulse.*` namespace.
+- Existing persistence, notification, Launch at Login, diagnostics, and legacy provider identifiers that depend on the previous application identity remain unchanged where required for compatibility.
+- Historical `v0.2.0-beta.1` release information and artifacts retain the original QuotaPulse name.
+
+### Distribution
+
+- The downloadable application and future release artifacts now use the **QuotaMew** product name.
+- Developer ID signing and Apple notarization are not yet available.
+- Automatic updates are not yet available.
+
 ## [0.2.0-beta.1] - 2026-09-05
 
 ### Added
