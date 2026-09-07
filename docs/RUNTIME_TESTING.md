@@ -2,32 +2,50 @@
 
 本文件是 QuotaMew v0.1 的人工 runtime 測試手冊。目標是找出長時間執行、反覆刷新、重連、Settings／menu lifecycle 與通知流程中的累積問題；不是用單元測試取代 soak test，也不是用單一記憶體讀數判定 memory leak。
 
+## v0.2 Milestone C Onboarding acceptance
+
+2026-09-07 source 已實作；使用者回報以下 planned runtime/UI checks 全數通過，故 Milestone C manual acceptance **COMPLETE（user-observed）**。這筆紀錄不是由 unit test、build 或 preview 推導，也不新增未回報的量測值。不要為了製造 fresh state 清除 production `dev.quotapulse.app` domain；只操作 Debug identity 或乾淨測試帳號。
+
+| 群組 | 人工檢查 | 結果 |
+| --- | --- | --- |
+| Fresh install | Finder／LaunchServices normal launch 後 status item 與單一 Onboarding 都可見；第二次 activation 只 focus 同一視窗；Codex 顯示目前 conservative diagnostics；Claude 同時標示 Experimental / Unverified；隱私文案正確；沒有自動通知提示 | 使用者回報通過 |
+| Shared settings | Remaining／Used 立即同步 Dashboard/status item；Automatic／Codex／Claude pin 沿用既有 unavailable-pin 規則；Launch at Login 顯示系統實際狀態，成功與失敗都正確回讀；沒有 Luna Reserve 選項 | 使用者回報通過 |
+| Complete | Get Started 不 refresh、不要求通知、不重插 status item；關閉視窗後下次 normal launch 不重開 | 使用者回報通過 |
+| Skip/close | Skip 與首次標準 close／Escape／Command-W 保存 skipped；先前手動改的 display、pin、Login Item 或通知選擇保留；Skip 本身沒有其他 side effect；下次 launch 不重開 | 使用者回報通過 |
+| Replay | Settings → General → Show Onboarding Again 反映目前設定；重複要求 focus/reuse；Close／Escape／Command-W 不改 completed/skipped/version；關閉後可再次開啟；不自動要求通知 | 使用者回報通過 |
+| Recovery | menu-bar intent OFF 的 explicit reopen 只顯示 Recovery；Onboarding 不同時出現。hidden + Login Item quiet exit，沒有 status item 或 Onboarding | 使用者回報通過 |
+| Notifications | 只有 Enable Notifications 會出現 macOS authorization；允許／拒絕後狀態正確；詳細 thresholds 仍只在 Settings → Notifications；Get Started/Skip/replay/display/pin 都不要求 | 使用者回報通過 |
+| Regression | 左鍵 Dashboard、右鍵 Refresh Now／Settings…／Quit、5 小時／每週、Luna Reserve、provider lifecycle、notification lifecycle 與單一 status item 都不退化 | 使用者回報通過 |
+| Appearance/accessibility | Light、Dark、English、繁體中文（臺灣）、Tab／Shift-Tab、Return、Escape、Command-W、VoiceOver heading/control order/provider text status 與窄視窗皆可用 | 使用者回報通過 |
+
+Fresh migration 另做三種受控 domain：完全空白顯示一次；模擬 Beta 2（只有既有 short-window reminder migration key、沒有 onboarding key）分類為 skipped 而不顯示；已有 completed/skipped/version 的 domain 原樣保留。使用者亦回報完成 Recovery priority、Login Item behavior、onboarding window focus/reuse、transient activation／Dock、notification explicit-action、Launch at Login、left-click Dashboard、right-click actions、5-hour／Weekly、English／Traditional Chinese、light／dark、keyboard 與 VoiceOver/accessibility smoke test。普通 XCTest 已覆蓋分類與 owner 行為；本段 manual acceptance 仍以使用者觀察為證據，不宣稱額外測量。
+
 ## v0.2 Product Polish acceptance
 
-2026-09-07 新增；以下均為**待人工驗收**，不因 XCTest/build 通過而勾選。Public release 仍是 Beta 2，工作樹是未發行 source。先以正常 Quit 結束既有測試 App，再從 Finder／LaunchServices 啟動唯一一份 fresh Debug app bundle；不要執行裸 Mach-O。既有長時間 runtime 手冊與下方歷史 Milestone B 證據繼續適用。
+2026-09-07 新增；使用者回報以下 planned checks 全數通過，Product Polish manual acceptance **COMPLETE（user-observed）**。不因 XCTest/build 通過而代替人工 evidence。Public release 仍是 Beta 2，工作樹是未發行 source。既有長時間 runtime 手冊與下方歷史 Milestone B 證據繼續適用。
 
 | # | 檢查 | 結果 |
 | --- | --- | --- |
-| 1 | 一般 Codex 顯示「5 小時／每週」；英文「5-hour／Weekly」 | 待驗 |
-| 2 | 一般視窗不顯示「主要配額週期／次要配額週期」 | 待驗 |
-| 3 | UI 沒有 raw gpt-reserve 或 base_model_inference | 待驗 |
-| 4 | Reserve 平常為精簡次要列；新鮮一般額度恰為 100% used 且 reset 未到期才展開；stale／缺值不展開 | 待驗 |
-| 5 | Remaining／Used 與 pin 切換正常，Reserve 不取代 status item 的一般百分比 | 待驗 |
-| 6 | 倒數正確且與名稱分開，reset 已過不宣稱完成；窄寬不截斷主要資訊 | 待驗 |
-| 7 | 實際 approaching／completed 通知名稱與 Dashboard 一致；Reserve 不通知 | 待驗 |
-| 8 | 左鍵開啟／關閉 Dashboard；外部點擊 dismissal 正常 | 待驗 |
-| 9 | 右鍵只開一份原生選單，不開 Dashboard；重複開關不累積 item | 待驗 |
-| 10 | 立即重新整理正常；進行中再次要求不產生重疊刷新 | 待驗 |
-| 11 | 未曾開 Dashboard 就直接右鍵「設定…」也能開既有 Settings；反覆開啟重用視窗 | 待驗 |
-| 12 | 退出 QuotaMew 正常結束，owned Codex child 清理，偏好/onboarding 不變 | 待驗 |
-| 13 | icon、—／0%／61%／100% 與 intrinsic width 不退化；notch／多螢幕可用 | 待驗 |
-| 14 | 沒有意外出現舊 QuotaPulse 公開 App 名稱 | 待驗 |
-| 15 | About（若提供）、recovery、Settings、Dashboard 與系統 App 名稱符合 QuotaMew／QuotaMew Debug | 待驗 |
-| 16 | Light mode；secondary Reserve 與 progress 對比清楚 | 待驗 |
-| 17 | Dark mode；包含 reduced transparency | 待驗 |
-| 18 | English 文案與右鍵選單 | 待驗 |
-| 19 | 繁體中文（臺灣）文案與右鍵選單 | 待驗 |
-| 20 | VoiceOver 讀出 provider／共用名稱／百分比；倒數仍可存取；方向鍵／Return／Escape 操作選單與 Command-Q 正常 | 待驗 |
+| 1 | 一般 Codex 顯示「5 小時／每週」；英文「5-hour／Weekly」 | 使用者回報通過 |
+| 2 | 一般視窗不顯示「主要配額週期／次要配額週期」 | 使用者回報通過 |
+| 3 | UI 沒有 raw gpt-reserve 或 base_model_inference | 使用者回報通過 |
+| 4 | Reserve 平常為精簡次要列；新鮮一般額度恰為 100% used 且 reset 未到期才展開；stale／缺值不展開 | 使用者回報通過 |
+| 5 | Remaining／Used 與 pin 切換正常，Reserve 不取代 status item 的一般百分比 | 使用者回報通過 |
+| 6 | 倒數正確且與名稱分開，reset 已過不宣稱完成；窄寬不截斷主要資訊 | 使用者回報通過 |
+| 7 | 實際 approaching／completed 通知名稱與 Dashboard 一致；Reserve 不通知 | 使用者回報通過 |
+| 8 | 左鍵開啟／關閉 Dashboard；外部點擊 dismissal 正常 | 使用者回報通過 |
+| 9 | 右鍵只開一份原生選單，不開 Dashboard；重複開關不累積 item | 使用者回報通過 |
+| 10 | 立即重新整理正常；進行中再次要求不產生重疊刷新 | 使用者回報通過 |
+| 11 | 未曾開 Dashboard 就直接右鍵「設定…」也能開既有 Settings；反覆開啟重用視窗 | 使用者回報通過 |
+| 12 | 退出 QuotaMew 正常結束，owned Codex child 清理，偏好/onboarding 不變 | 使用者回報通過 |
+| 13 | icon、—／0%／61%／100% 與 intrinsic width 不退化；notch／多螢幕可用 | 使用者回報通過 |
+| 14 | 沒有意外出現舊 QuotaPulse 公開 App 名稱 | 使用者回報通過 |
+| 15 | About（若提供）、recovery、Settings、Dashboard 與系統 App 名稱符合 QuotaMew／QuotaMew Debug | 使用者回報通過 |
+| 16 | Light mode；secondary Reserve 與 progress 對比清楚 | 使用者回報通過 |
+| 17 | Dark mode；包含 reduced transparency | 使用者回報通過 |
+| 18 | English 文案與右鍵選單 | 使用者回報通過 |
+| 19 | 繁體中文（臺灣）文案與右鍵選單 | 使用者回報通過 |
+| 20 | VoiceOver 讀出 provider／共用名稱／百分比；倒數仍可存取；方向鍵／Return／Escape 操作選單與 Command-Q 正常 | 使用者回報通過 |
 
 Reserve 耗盡條件可先用 synthetic preview/fixture 檢查，不為驗收耗用真實額度或改寫 provider 資料。普通 XCTest 不送實際通知；系統通知送達須另行明確操作。這輪未完成新 UI 的視覺／VoiceOver、真實通知、installed Login Item 或效能驗證，不沿用舊 Milestone B 的人工通過紀錄冒充本次證據。
 
@@ -83,7 +101,7 @@ App-hosted live tests 的 UserDefaults opt-in 也必須寫入 Debug domain：`ru
 
 主要開發帳號先前觀察到的 ChatGPT → QuotaPulse cascade，分類為歷史、使用者範圍的 macOS Control Center stale application association，與過往非典型開發／測試啟動拓撲有關，不是目前 QuotaPulse Release 架構缺陷。不要以程式清除或修復該 stale state；不要改 bundle identifier、`autosaveName` 或使用 private Control Center API。人工 menu-bar runtime 測試應從 Finder、Spotlight 或 `/usr/bin/open` 啟動 app bundle，不要從 Codex／ChatGPT 擁有的 shell 直接執行 Mach-O。
 
-Final status: **Hybrid NSStatusItem migration COMPLETE; Milestone A COMPLETE / frozen; Milestone B COMPLETE; Milestone C NEXT / NOT STARTED.**
+Final status: **Hybrid NSStatusItem migration COMPLETE; Milestone A COMPLETE / frozen; Milestone B COMPLETE; Milestone C COMPLETE; Product Polish COMPLETE.** Next: v0.2 Menu Bar Display Polish／Beta 3 stabilization work. Public release remains v0.2.0-beta.2; Beta 3 is not released and final v0.2.0 is not complete.
 
 ### Autosave identity 與 status-item 寬度
 

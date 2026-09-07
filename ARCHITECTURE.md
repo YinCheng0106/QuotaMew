@@ -68,7 +68,7 @@ ResetEvent，保留不可變的原始來源 URL 與 source name
 
 UI 只接收正規化後的 snapshot；不解析 provider payload、不啟動指令，也不讀取檔案。
 
-### v0.2 Product Polish（2026-09-07，尚未發行）
+### v0.2 Product Polish（2026-09-07，COMPLETE，尚未發行）
 
 額度名稱只有一個來源：`UsageWindowPresentation`。精確 duration 18,000 秒對應 `5-hour`／`5 小時`，604,800 秒對應 `Weekly`／`每週`，未知／缺少／無效 duration 使用通用名稱；不由 array position、primary/secondary 或倒數推論，也不把 raw provider label 顯示給使用者。Dashboard row、VoiceOver header 及 approaching/completed notification 文案都共用此 formatter；`UsagePresentation` 繼續只負責 Remaining／Used 百分比。Domain ID、label、duration、reset/cycle metadata 保持原值；`LocalResetDetector` 不參與本地化。
 
@@ -78,7 +78,7 @@ Reserve 的 approaching reminders 在 policy 中排除；completed resets 在 se
 
 同一 `StatusItemController` 另持有一個 `StatusItemContextMenu`／`NSMenu`。既有標準 button 透過公開 [`sendAction(on:)`](https://developer.apple.com/documentation/appkit/nscontrol/sendaction(on:)) 接收左右 mouse-up，以 current event type 分派；右鍵關閉 popover 後透過 [`NSMenu.popUp(positioning:at:in:)`](https://developer.apple.com/documentation/appkit/nsmenu/popup(positioning:at:in:)) 顯示同一份選單。左鍵保持原 Dashboard toggle。Refresh 沿用 `AppModel.refreshManually()`；Settings 經 App 提供的公開 SwiftUI `openSettings` action 開啟原 Settings scene；Quit 正常 `NSApplication.terminate`。Teardown 清除 menu target/action 並取消 tracking，再走既有 observer/popover/item teardown。沒有 custom status view、global monitor、第二個 status item 或 private API；autosave/bundle/recovery/login-item 語意不變。
 
-Milestone C 只有 persistence contract，Onboarding UI 仍為 v0.2 必要的下一項實作。原外部 Reset Intelligence D/E reader/network/matching 移至 v0.3；frozen contracts 保留。完整政策與版本流程見 [V0_2_PLAN.md](docs/V0_2_PLAN.md)。
+Milestone C 的單頁原生 Onboarding、啟動排序、重看入口與 migration 已完成 source 實作；2026-09-07 使用者回報 planned runtime/UI checks 全數通過，manual acceptance COMPLETE。此為 user-observed evidence，不由 XCTest 或 build 推導。原外部 Reset Intelligence D/E reader/network/matching 移至 v0.3；frozen contracts 保留。完整政策與版本流程見 [V0_2_PLAN.md](docs/V0_2_PLAN.md)。
 
 ## 4. Domain model
 
@@ -293,7 +293,7 @@ Provider enablement 的非同步 cleanup 由 `NotificationService` 擁有，而�
 
 Lifecycle state、cleanup task、request filtering 與 reset baseline 都以 `ProviderID` 分開保存。Codex 的 cleanup 不等待或刪除 Claude 的 pending request、snapshot、eligibility、dedup metadata 或 detector entries；系統沒有新增全域 provider transition queue。
 
-只有出現第一個 eligible decision 且 authorization status 是 `.notDetermined` 時才要求 `.alert`／`.sound` 權限。並行評估共用同一個 authorization request；權限等待結束後，service 只讓最新一輪評估繼續，並以等待後的時間重新檢查 freshness、reset 與 dedup state。這避免使用者停留在系統提示期間又完成更新時，舊 percentage 或已過期 reset 才被送出。
+Provider refresh／notification evaluation 永遠不要求授權；`.notDetermined` 只代表本輪不送。只有使用者在 Settings 或 Onboarding 明確按下「Enable Notifications」時，`SettingsModel` 才透過同一個 `NotificationService.requestAuthorization()` 路徑要求 `.alert`／`.sound` 權限。開啟、略過、完成或重看 Onboarding、切換 Remaining／Used、切換 pinned provider 都不會觸發系統提示。並行的明確授權要求仍由 service 合併為同一筆 task。
 
 之後先讀 system settings；`.denied` 不再要求、不送通知，也不影響 provider refresh、UI 或下一輪排程。使用者日後在 System Settings 重新允許後，尚未 claim 且仍 eligible 的 threshold 可在下一輪 refresh 送出。`UserNotificationCenterClient` 持有 notification center delegate，讓 App 在前景時也能要求 banner／sound presentation。Debug build 的 Settings 提供 development-only action，透過同一個 `UserNotificationCenterClient` 要求授權並排定約五秒後的固定 identifier 測試通知；其 protocol method、model action、feedback state 與 UI 全部以 `#if DEBUG` 排除於 Release。授權與本機通知提交遵循 Apple 的 [Requesting authorization](https://developer.apple.com/documentation/usernotifications/asking-permission-to-use-notifications) 與 [Scheduling a notification locally](https://developer.apple.com/documentation/usernotifications/scheduling-a-notification-locally-from-your-app) 流程。
 
@@ -318,6 +318,20 @@ Completed-reset 通知以 provider 顯示名稱與 normalized window label/durat
 QuotaMew 使用原生 `Settings` scene 與 `@MainActor SettingsStore`。Settings 以原生 `TabView` 固定為 General／Providers／Notifications 三頁：General 包含 app behavior、presentation 與 Diagnostics；Providers 保留 enablement 與 Claude Experimental / Unverified 說明；Notifications 保留所有既有 reminder 與 permission 行為。`SettingsStore` 是 provider enablement、presentation mode、optional pinned provider、通知總開關，以及短視窗 1 小時／30 分鐘與長視窗 24／6／1 小時門檻的單一來源，並以 typed UserDefaults keys 保存；SwiftUI 只透過 `SettingsModel` 修改 store，再由 `UsageService` 與 `NotificationService` 讀取同一份狀態。Provider toggle 先同步通知 `NotificationService` 使舊 lifecycle 失效，再保存設定、更新 `AppModel` 投影，並於 enable 時要求共用 refresh。`SettingsModel.setProvider` 回傳 `Void`；View 只表達使用者意圖，不接收或 await cleanup task。Cleanup 可以非同步完成，因正確性由 service 的 provider generation 與 destructive-point validation 保證，不依賴 SwiftUI call site 記住實作細節。短、長視窗的 1 小時選項彼此獨立，舊版共用 1 小時偏好會作為短視窗偏好的 migration 預設。`NotificationService` 關閉時不再建立提醒，並移除 QuotaMew 自己的 pending reset requests；關閉單一門檻只移除相符 duration class 的門檻。
 
 Launch at Login 使用 `ServiceManagement` 的 `SMAppService.mainApp`。Settings 每次顯示時重新讀取 system status；register／unregister 失敗時保留系統實際狀態並顯示安全錯誤，不把 UI toggle 當成成功依據。
+
+### 10.1 Onboarding ownership 與啟動優先序
+
+`SettingsStore` 保持 onboarding persistence 的唯一 owner：`onboarding.state` 使用 `neverShown`／`completed`／`skipped`，`onboarding.last-completed-version` 配合單一 `currentOnboardingVersion = 1`。`SettingsModel` 只提供完成／略過 actions 與既有 product settings 的 observable projection；沒有第二份 onboarding preferences、usage mode、provider pin、Launch at Login 或 notification permission state。
+
+Fresh domain 會立即保存 `neverShown`／version 0，讓之後初始化不被其他 defaults migration 誤判。缺少 onboarding state、但已存在 menu-bar／provider／notification／presentation／Reset Intelligence 或 bounded notification-state key 的 established domain，會一次性保存 `skipped`／current version，避免 Beta 2 → Beta 3 與較早 QuotaPulse beta 升級時強制彈窗。既有明確 onboarding state/version 永遠優先。完全沒有任何 evidence 的舊安裝與 fresh install 無法可靠區分，按 fresh 處理。
+
+`QuotaMewApplicationDelegate` 先套用既有 `MenuBarRecoveryPolicy`，再判斷 Onboarding：hidden login-item launch 在建立 status item 前 quiet exit；hidden explicit launch 只顯示 Recovery；只有 normal explicit launch、requested visible 且 state 為 `neverShown` 才顯示首次 Onboarding。`completed`／`skipped` 與 requested-visible login-item launch 都不顯示。Recovery active 時手動重看要求只會把 Recovery 帶到前景，不建立競爭視窗。
+
+`OnboardingWindowController` 是 bounded presentation owner，只管理 show、focus、close、首次／重看 context 與一份可重用 `NSWindowController`。重複要求 focus 既有視窗。首次 Skip 與標準 close 保存 `skipped`；Get Started 保存 `completed`；兩者都保存 current version 並關閉，但不 refresh provider、不要求通知、不重插 menu item。Settings → General 的重看忽略 persisted completion eligibility，且 Close／Escape／Command-W 都不改 state/version。
+
+Onboarding 直接讀共用 `SettingsModel`：Remaining／Used 與 pinned provider 立即走既有 presentation observation；Launch at Login 走原 `LaunchAtLoginController` 並回讀系統狀態；通知 opt-in 走原 `NotificationService`。Provider status 由既有 `CompatibilityDiagnosticsSnapshot` 產生；它可讀 provider 的 bounded runtime diagnostic snapshot，但不呼叫 `fetchUsage()`、不建立另一個 probe 或 bridge，也不產生 onboarding network traffic。Claude 永遠另顯示 Experimental / Unverified；Luna Reserve 不成為 provider 選項。
+
+QuotaMew 繼續是 `LSUIElement = true`。Recovery 與 Onboarding 共用 delegate 的 activation-policy ownership：第一個可見 presentation 記住原 policy，必要時暫切 `.regular`；最後一個關閉後恢復原 policy，不永久建立 Dock app。Onboarding 使用原生 SwiftUI controls、文字化 provider 狀態、heading traits、Return default action 與 Escape cancel action；Command-W 由標準 closable `NSWindow` 走相同 close delegate。實際 focus、Tab／Shift-Tab、VoiceOver、light/dark 與英／繁中仍屬人工驗收，不能由 unit tests 宣稱通過。
 
 同一個 app target 以 build configuration 分開 macOS bundle identity：Release 保留 production `dev.quotapulse.app`，Debug 使用 `dev.quotapulse.development.app` 並以 `QuotaMew Debug` 顯示。`PRODUCT_NAME`／executable 維持 `QuotaMew`，不複製 target。由於 `SMAppService.mainApp`、`UserDefaults.standard`、`UNUserNotificationCenter.current()` 與 macOS 26 Control Center 的第三方 menu bar 狀態都以目前 app identity 為邊界，開發操作只會落在 Debug identity；兩者不共用 preferences，也沒有 App Group entitlement。Debug 因而有自己的首次啟動設定與通知授權，這是刻意隔離而非 migration。
 
@@ -345,7 +359,7 @@ Claude Code 在 Settings 明確標為 Experimental／Unverified，只有 enable�
 
 2026-09-02 的 clean macOS user account 以 Finder／LaunchServices 正常啟動 Release app bundle，確認 QuotaPulse 與 ChatGPT 是獨立的選單列應用程式；隱藏任一者不會影響另一者。主要開發帳號曾觀察到的 ChatGPT → QuotaPulse cascade，分類為歷史、使用者範圍的 macOS Control Center stale application association，源自過往非典型開發／測試啟動拓撲，不是目前 QuotaPulse Release 架構缺陷，也不是正常使用者應遇到的產品行為。不要以程式清除或修復該狀態，不要改 bundle identifier、`autosaveName` 或使用 private Control Center API；人工測試應從 Finder、Spotlight 或 LaunchServices／`open` 啟動 `.app`，不要直接執行 Mach-O。
 
-**Milestone A — COMPLETE / frozen. Milestone B — COMPLETE. Milestone C — NEXT / NOT STARTED.** Automated XCTest、Debug／Release builds、zero status-item host、recovery／reopen、compact width 與 manual acceptance 均已分別驗證；本次不實作 Milestone C。
+**Milestone A — COMPLETE / frozen. Milestone B — COMPLETE. Milestone C — COMPLETE. Product Polish — COMPLETE.** Milestone C source implementation 與 user-observed manual runtime/UI acceptance 均完成；涵蓋 fresh first-run、Skip、Get Started、Settings replay、Recovery priority、Login Item、window focus/reuse、transient activation／Dock、notification explicit-action、Launch at Login、Remaining／Used、pinned provider、provider diagnostics、left/right-click actions、5-hour／Weekly、Luna Reserve、English／Traditional Chinese、light／dark、keyboard 與 VoiceOver/accessibility smoke test。Deterministic tests 仍分別證明 persistence、startup、single-presenter、notification opt-in、no-fetch 與 architecture boundaries；不把它們當成人工 evidence。下一步是 v0.2 Menu Bar Display Polish／Beta 3 stabilization work；Beta 3 release preparation 尚未開始，Reset Intelligence 仍屬 v0.3。
 
 ## 11. Compatibility Diagnostics
 

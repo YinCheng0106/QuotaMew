@@ -11,11 +11,11 @@ v0.2 聚焦隱私優先的本機額度呈現、可靠的原生選單列操作與
 | --- | --- |
 | A — contract freeze | **COMPLETE / frozen**。既有 feed schema、presentation、pin 與 onboarding persistence contracts 保留。 |
 | B — Display + Settings | **COMPLETE**。Hybrid NSStatusItem、Remaining／Used、pin、Settings、recovery 與 zero-XCTest-host gates 已完成。 |
-| C — Onboarding | **NOT STARTED（UI）／REQUIRED for v0.2**。已有 OnboardingState、versioned persistence 與測試；尚無首次啟動頁、略過／完成流程或 Settings 重看入口。 |
-| Product Polish | 額度命名、Luna Reserve 呈現、右鍵選單與公開文件修正已實作於工作樹；驗證見 [Product Polish 稽核](PRODUCT_POLISH_AUDIT.md)，人工驗收仍待完成。 |
+| C — Onboarding | **COMPLETE**。Source implementation 與 2026-09-07 user-observed manual runtime/UI acceptance 均完成；單頁原生 UI、啟動優先序、首次／重看語意、明確通知授權與 migration boundaries 已驗收。 |
+| Product Polish | **COMPLETE**。額度命名、Luna Reserve 呈現、右鍵選單與公開文件修正已完成；驗證見 [Product Polish 稽核](PRODUCT_POLISH_AUDIT.md)，planned manual acceptance 已由使用者回報全數通過。 |
 | Release acceptance | C 與 Product Polish 驗收 → **beta.3** → release hardening → **rc.1** → **v0.2.0**。 |
 
-Product Polish source 完成不代表 Milestone C 完成，也不代表 Beta 3 可立即打包。C 仍在 v0.2；本次 A–F 任務不另行實作 Onboarding。
+Milestone C source implementation 與 manual acceptance 均完成；這不代表 Beta 3 已發行或 v0.2.0 final 已完成。Public release 仍是 **v0.2.0-beta.2**；Reset Intelligence 仍屬 v0.3。
 
 ## v0.2 交付範圍
 
@@ -31,17 +31,21 @@ Product Polish source 完成不代表 Milestone C 完成，也不代表 Beta 3 �
 
 不納入：Reset Intelligence network/feed reader、cache/service、local matching、collector/backend、自動更新、歷史圖表、burn-rate、Gemini/OpenCode 或 Claude bridge 安裝器。Claude 保持 **Experimental / Unverified**。
 
-## Milestone C — 必要的下一項產品實作
+## Milestone C — Onboarding
 
-單頁原生首次啟動流程，重用既有 preferences 與 allowlisted diagnostics：
+單頁原生首次啟動流程已重用既有 preferences 與 allowlisted diagnostics：
 
 1. 歡迎與隱私摘要：讀取本機額度，不讀 prompt、transcript、credential 或 coding history。
 2. Codex runtime detected/not detected 與 Claude snapshot configured/not configured 狀態；不新增 provider I/O、bridge installer 或私密路徑輸出。
 3. 使用者可選 Launch at Login、Remaining／Used、pinned provider；初次呈現不覆寫既有選擇。
-4. 通知權限只能由使用者明確動作觸發；整合時須審核現有 refresh-driven authorization，避免首次啟動自動跳出提示。
-5. Skip 與 Complete 都可進 Dashboard；Settings 可重看，重看不重置任何 provider、notification 或 onboarding 選擇。
+4. 通知權限只由「Enable Notifications」明確動作觸發；開啟／略過／完成／重看 Onboarding 與一般 refresh 都不要求權限。
+5. Skip 保存 `skipped`；Get Started 保存 `completed`。首次視窗的標準關閉視同 Skip；Settings 重看關閉只關視窗，不改 onboarding state/version。
+6. `OnboardingWindowController` 只擁有一個可重用視窗；product settings 仍由共用 `SettingsModel`／`SettingsStore` 擁有。顯示期間暫時把 accessory policy 切為 regular，最後一個 presentation 關閉後恢復原值。
+7. 啟動順序固定為 hidden login-item quiet exit → hidden explicit recovery → normal explicit eligible onboarding。Recovery 存在時不另開 Onboarding，兩者不競爭焦點。
 
 持久化沿用 `onboarding.state`（neverShown／completed／skipped）、`onboarding.last-completed-version` 與 current version 1，不新增平行 state owner。
+
+Fresh installation 在初次建立 `SettingsStore` 前沒有 onboarding state 與任何既有安裝 evidence，會保存 `neverShown`／version 0。已啟動過 Beta 2 的 domain 會有短視窗 reminder migration key；較早版本或 developer domain 若有既有 menu-bar、provider、notification、presentation、Reset Intelligence 或 notification state key，也視為 established installation。這類 domain 缺少 onboarding state 時一次性保存 `skipped`／current version，升級不強制搶焦點。若 domain 已有 onboarding state/version，該明確狀態優先且不被 migration 覆寫；只有完全沒有 evidence 的 domain 才視為 fresh。安裝過但從未啟動、因而沒有任何 preference domain 的 app，無法與 fresh install 區分，會顯示首次使用說明。
 
 驗收須涵蓋 fresh user、Codex absent、Claude unconfigured、all disabled、permission denied、完成／略過／重看、重啟保留，以及英／繁中、鍵盤、VoiceOver、light/dark。若說明需要 quota-window 名稱，使用 UsageWindowPresentation。
 
@@ -95,6 +99,6 @@ Refresh 使用 AppModel.refreshManually()，保留 RefreshCoordinator 合併。S
 
 Git 歷史 fbbc449 與 a077596 顯示版本／build number 在 release preparation 更新。本次保留 App **0.2.0 (2)**，以 CHANGELOG Unreleased 記錄。
 
-**下一項任務：實作 Milestone C Onboarding，完成 C 與 Product Polish 人工驗收。** 通過後另開 Beta 3 release preparation：把兩個 App configuration 的 build number 更新為 3，保留 marketing version 0.2.0，驗證 Release artifact，再依明確授權準備 `release/v0.2.0-beta.3/QuotaMew.app`。既有打包指令為 `./script/create-dmg.sh 0.2.0-beta.3`；它必須在後續發行任務才執行，不是本次命令。
+**下一項任務：v0.2 Menu Bar Display Polish／Beta 3 stabilization work。** Beta 3 release preparation 另行進行：把兩個 App configuration 的 build number 更新為 3，保留 marketing version 0.2.0，驗證 Release artifact，再依明確授權準備 `release/v0.2.0-beta.3/QuotaMew.app`。既有打包指令為 `./script/create-dmg.sh 0.2.0-beta.3`；它必須在後續發行任務才執行，不是本次命令。Do not mark v0.2.0-beta.3 released or final v0.2.0 complete here。
 
 不得把編譯／XCTest 視為 VoiceOver、真實通知送達、Launch at Login、Developer ID signing、notarization 或 DMG 發行證據。

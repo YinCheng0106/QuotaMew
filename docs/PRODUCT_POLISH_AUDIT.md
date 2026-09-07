@@ -2,9 +2,9 @@
 
 ## 結論與起始狀態
 
-本次 A–F **source implementation COMPLETE**，可開始 Product Polish 人工驗收。Repository **尚未達 Beta 3 整版 acceptance**：Milestone C Onboarding UI 與本次人工檢查仍未完成。未提交、push、tag、發布或製作 DMG。
+本次 A–F **source implementation COMPLETE**；Product Polish 與 Milestone C Onboarding 的 planned manual runtime/UI acceptance 已由使用者回報全數通過，故兩者均 **COMPLETE（user-observed）**。Repository **尚未達 Beta 3 整版 acceptance**；public release 仍為 v0.2.0-beta.2。未提交、push、tag、發布或製作 DMG。
 
-起始工作樹乾淨，HEAD 為 ed96cb3；origin 已是 YinCheng0106/QuotaMew。[公開版本](https://github.com/YinCheng0106/QuotaMew/releases/tag/v0.2.0-beta.2)為 v0.2.0-beta.2，A/B COMPLETE，Hybrid migration 已完成。Milestone C 只有 OnboardingState、versioned persistence 與測試，沒有 UI。這次修正的是公開文件殘留，沒有再次進行產品更名。
+本文件記錄的起始工作樹為乾淨狀態，HEAD 為 ed96cb3；當時 [公開版本](https://github.com/YinCheng0106/QuotaMew/releases/tag/v0.2.0-beta.2)為 v0.2.0-beta.2，A/B COMPLETE，Hybrid migration 已完成。後續 Milestone C 已加入 native Onboarding source，並在 2026-09-07 完成使用者回報的人工驗收；這次 checkpoint 沒有再次進行產品更名。
 
 ## 實作決策
 
@@ -14,7 +14,7 @@
 - Reserve 精確比對既有 normalized codex.base_model_inference.primary/secondary 與 codex.gpt-reserve.primary/secondary；兩種語言都顯示 Luna Reserve。未知 ID 不做 substring 或 billing 推論。
 - Reserve 平常為次要精簡列。available、capture age 0..<15 分鐘、一般 codex bucket 的已知 5 小時或每週 window 原始 usedPercentage == 100 且 reset 在未來，才展開完整列。這是展開資訊的規則，不宣稱 Reserve active 或保證可用。Reserve 不取代一般 window identity 或 status-item percentage。
 - v0.2 排除 Reserve approaching/completed 通知，包含授權前過濾；一般 threshold、dedup identity、eligibility、lifecycle generation 不變。LocalResetDetector 檔案與演算法完全未修改，原有 bounded current-cycle state 繼續更新，沒有新的 Reserve history。
-- 同一 StatusItemController 持有同一 NSMenu；標準 NSStatusBarButton 以公開 sendAction(on:) 接收左右 mouse-up。左鍵維持 Dashboard；右鍵只顯示原生選單。Refresh → AppModel.refreshManually() → 既有合併流程；Settings → SwiftUI openSettings → 原 Settings scene；Quit → 正常 NSApplication.terminate。只有 Quit 使用 Command-Q。無新視窗實作、status view、global monitor 或 observer。
+- 同一 StatusItemController 持有同一 NSMenu；標準 NSStatusBarButton 以公開 sendAction(on:) 接收左右 mouse-up。左鍵維持 Dashboard；右鍵只顯示原生選單。Refresh → AppModel.refreshManually() → 既有合併流程；Settings → SwiftUI openSettings → 原 Settings scene；Quit → 正常 NSApplication.terminate。只有 Quit 使用 Command-Q。Product Polish 沒有新增 status view、global monitor 或 observer；Milestone C 的 bounded Onboarding window 是獨立且唯一的 presentation owner。
 - README 改為 Beta 2 與目前 repository；修正 provider-strategy 中一般 Codex 記憶體 snapshot 的舊品牌描述。script/create-dmg.sh 僅修正錯誤的 usage 路徑，未執行。
 - v0.2 保留 C + Product Polish + beta feedback + hardening；外部 Reset Intelligence D/E reader/network/matching 移至 v0.3，保留 A frozen contracts。
 
@@ -24,7 +24,7 @@
 
 | Gate | 本次結果 |
 | --- | --- |
-| 完整 parallel XCTest | **294 passed / 2 skipped / 0 failures（296 total）** |
+| 完整 parallel XCTest | **313 passed / 2 skipped / 0 failures（315 total）** |
 | 新增測試 | 16 個：命名／Reserve 8、controller/menu 3、Codex mapping 1、Reserve notifications 1、branding 3；並更新既有通知／本地化預期 |
 | 初次完整執行 | 一個舊 Claude 通知 title 預期未更新；修正後完整 suite 重跑通過 |
 | Zero XCTest status-item hosts | 7 個 parallel test processes（92491–92497）；既有 AppRuntimeEnvironment gate + delegate/fake controller tests 通過；涵蓋本輪時間的 Control Center read-only log 無 dev.quotapulse.development.app host 事件 |
@@ -41,9 +41,9 @@ XCTest 結果位於本機 /tmp/QuotaMewPolishTestsFinal.xcresult；Debug／Relea
 
 ## 人工驗收與下一項任務
 
-[20 項人工清單](RUNTIME_TESTING.md#v02-product-polish-acceptance)涵蓋 Dashboard 名稱／Reserve／Remaining-Used／倒數、真實通知一致性、左右鍵／Refresh／Settings／Quit／寬度、全部公開品牌、light/dark、English／繁中與 VoiceOver。特別檢查「尚未開過 Dashboard 就直接右鍵 Settings」與原生鍵盤導航；這些仍待驗收。
+[20 項人工清單](RUNTIME_TESTING.md#v02-product-polish-acceptance)涵蓋 Dashboard 名稱／Reserve／Remaining-Used／倒數、真實通知一致性、左右鍵／Refresh／Settings／Quit／寬度、全部公開品牌、light/dark、English／繁中與 VoiceOver；使用者回報全數通過。Milestone C 的 fresh first-run、Skip、Get Started、Settings replay、Recovery priority、Login Item、window focus/reuse、transient activation／Dock、notification explicit-action、Launch at Login、provider diagnostics、keyboard 與 accessibility smoke test 亦已回報通過。這些是 user-observed acceptance evidence，不由 XCTest/build 取代。
 
-**下一項任務：實作 Milestone C Onboarding，完成 C 與 Product Polish 人工 acceptance。** 完成後才另行進行 Beta 3 release preparation → hardening → rc.1 → v0.2.0。
+**下一項任務：v0.2 Menu Bar Display Polish／Beta 3 stabilization work。** Beta 3 release preparation → hardening → rc.1 → v0.2.0 仍是後續工作；本次不標記 Beta 3 或 final v0.2.0 完成。
 
 版本由 app target 的 MARKETING_VERSION/CURRENT_PROJECT_VERSION 驅動；Git fbbc449、a077596 顯示它們於 release preparation 調整，本次維持 0.2.0 (2)。後續 Beta 3 任務應將兩個 app configuration build number 改為 3，保留 0.2.0，驗證並準備 release/v0.2.0-beta.3/QuotaMew.app，之後才在授權下執行 `./script/create-dmg.sh 0.2.0-beta.3`。Test target 自有版本不作 App 版本來源。未改寫任何歷史 release entry。
 
