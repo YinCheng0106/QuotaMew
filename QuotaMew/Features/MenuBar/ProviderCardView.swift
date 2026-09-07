@@ -18,10 +18,18 @@ struct ProviderCardView: View {
                 lastUpdatedAt: state.lastUpdatedAt
             )
 
-            if let snapshot = state.snapshot, !snapshot.windows.isEmpty {
-                ForEach(snapshot.windows) { window in
-                    UsageWindowRow(window: window, mode: usagePresentationMode)
-                }
+            let windows = ProviderWindowsPresentation(state: state)
+            ForEach(windows.regularWindows) { window in
+                UsageWindowRow(window: window, mode: usagePresentationMode, providerID: state.providerID)
+            }
+            ForEach(windows.reserveWindows) { window in
+                UsageWindowRow(
+                    window: window,
+                    mode: usagePresentationMode,
+                    providerID: state.providerID,
+                    isCompact: !windows.showsReserveProminently
+                )
+                .foregroundStyle(windows.showsReserveProminently ? .primary : .secondary)
             }
 
             if presentation.showsStatusMessage {

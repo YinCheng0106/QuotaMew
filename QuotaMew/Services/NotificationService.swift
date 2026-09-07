@@ -198,7 +198,14 @@ final class NotificationService: NotificationServicing {
         )
         stateStore.save(evaluation.state)
 
-        guard !evaluation.decisions.isEmpty || !localResetEvaluation.resets.isEmpty else {
+        let deliverableResets = localResetEvaluation.resets.filter {
+            !UsageWindowPresentation(
+                providerID: $0.identity.providerID,
+                windowID: $0.identity.windowID,
+                duration: $0.windowDuration
+            ).isReserve
+        }
+        guard !evaluation.decisions.isEmpty || !deliverableResets.isEmpty else {
             return
         }
         guard (try? await isAuthorized(requestIfNeeded: true)) == true else { return }
@@ -223,7 +230,7 @@ final class NotificationService: NotificationServicing {
         )
         stateStore.save(deliveryEvaluation.state)
 
-        for reset in localResetEvaluation.resets where localResetDetector.isFreshForDelivery(
+        for reset in deliverableResets where localResetDetector.isFreshForDelivery(
             reset,
             now: deliveryNow
         ) {
@@ -529,8 +536,11 @@ final class NotificationService: NotificationServicing {
                 locale: locale
             ),
             body: AppLocalization.resetCompletedBody(
-                windowLabel: reset.windowLabel,
-                duration: reset.windowDuration,
+                windowName: UsageWindowPresentation(
+                    providerID: reset.identity.providerID,
+                    windowID: reset.identity.windowID,
+                    duration: reset.windowDuration
+                ).displayName(locale: locale),
                 locale: locale
             ),
             delay: 1

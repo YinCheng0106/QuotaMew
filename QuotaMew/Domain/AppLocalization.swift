@@ -44,11 +44,12 @@ enum AppLocalization {
 
     static func notificationTitle(
         providerName: String,
+        windowName: String,
         thresholdMinutes: Int,
         locale: Locale
     ) -> String {
         string(
-            "notification.reset.title \(providerName) \(thresholdLabel(minutes: thresholdMinutes, locale: locale))",
+            "notification.reset.title \(providerName) \(windowName) \(thresholdLabel(minutes: thresholdMinutes, locale: locale))",
             locale: locale
         )
     }
@@ -65,25 +66,10 @@ enum AppLocalization {
     }
 
     static func resetCompletedBody(
-        windowLabel: String,
-        duration: Duration?,
+        windowName: String,
         locale: Locale
     ) -> String {
-        let description: String
-        switch duration?.components {
-        case let components? where components.seconds == 5 * 60 * 60
-            && components.attoseconds == 0:
-            description = string("window.description.5-hour", locale: locale)
-        case let components? where components.seconds == 7 * 24 * 60 * 60
-            && components.attoseconds == 0:
-            description = string("window.description.7-day", locale: locale)
-        default:
-            let trimmedLabel = windowLabel.trimmingCharacters(in: .whitespacesAndNewlines)
-            description = trimmedLabel.isEmpty
-                ? string("window.description.generic", locale: locale)
-                : trimmedLabel
-        }
-        return string("notification.reset.completed.body \(description)", locale: locale)
+        string("notification.reset.completed.body \(windowName)", locale: locale)
     }
 
     static func thresholdLabel(minutes: Int, locale: Locale) -> String {

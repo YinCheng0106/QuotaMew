@@ -171,6 +171,12 @@ struct ResetNotificationPolicy: Equatable, Sendable {
             }
 
             for window in snapshot.windows {
+                let presentation = UsageWindowPresentation(
+                    providerID: providerState.providerID,
+                    window: window
+                )
+                // Reserve is informational in v0.2; no new fallback-quota reminders.
+                guard !presentation.isReserve else { continue }
                 guard
                     let resetAt = window.resetAt,
                     resetAt.timeIntervalSince1970.isFinite,
@@ -247,6 +253,7 @@ struct ResetNotificationPolicy: Equatable, Sendable {
                         kind: kind,
                         title: AppLocalization.notificationTitle(
                             providerName: providerState.providerID.displayName,
+                            windowName: presentation.displayName(locale: locale),
                             thresholdMinutes: selectedThreshold,
                             locale: locale
                         ),

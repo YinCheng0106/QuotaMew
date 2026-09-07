@@ -6,6 +6,33 @@ import UserNotifications
 final class NotificationServiceTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 2_000_000_000)
 
+    func testReserveDoesNotSendRemindersCompletedResetsOrRequestPermission() async {
+        for bucket in ["base_model_inference", "gpt-reserve"] {
+            let (service, center, store) = makeService(status: .notDetermined)
+            let id = "codex.\(bucket).primary"
+            let baseline = makeState(windowID: id, resetAfter: 3_600, usedPercentage: 82)
+            let after = now.addingTimeInterval(3_630)
+            let refreshed = makeState(
+                windowID: id, resetAt: after.addingTimeInterval(604_800),
+                usedPercentage: 1, capturedAt: after
+            )
+            let detectorBaseline = LocalResetDetector.standard.evaluate([baseline], state: .init(), now: now)
+            let detectorReset = LocalResetDetector.standard.evaluate([refreshed], state: detectorBaseline.state, now: after)
+            XCTAssertEqual(detectorReset.resets.count, 1, "Detector semantics must remain unchanged")
+
+            await service.evaluate([baseline], now: now)
+            await service.evaluate([refreshed], now: after)
+            XCTAssertTrue(center.requests.isEmpty)
+            XCTAssertEqual(center.authorizationRequestCount, 0)
+            XCTAssertTrue(store.state.entries.isEmpty, "Reserve does not introduce reminder dedup entries")
+
+            await service.evaluate([makeState(resetAt: after.addingTimeInterval(3_600), capturedAt: after)], now: after)
+            XCTAssertEqual(center.authorizationRequestCount, 1)
+            XCTAssertEqual(center.requests.count, 1)
+            XCTAssertTrue(center.requests[0].title.contains("Weekly"))
+        }
+    }
+
     func testWeeklyWindowSupportsTwentyFourHourReminder() async throws {
         let (service, center, _) = makeService()
 
@@ -16,7 +43,7 @@ final class NotificationServiceTests: XCTestCase {
 
         let request = try XCTUnwrap(center.requests.first)
         XCTAssertEqual(center.requests.count, 1)
-        XCTAssertEqual(request.title, "Codex resets in 24 hours")
+        XCTAssertEqual(request.title, "Codex Weekly quota resets in 24 hours")
         XCTAssertEqual(request.body, "You still have 61% of your quota remaining.")
     }
 
@@ -30,7 +57,7 @@ final class NotificationServiceTests: XCTestCase {
 
         let request = try XCTUnwrap(center.requests.first)
         XCTAssertEqual(center.requests.count, 1)
-        XCTAssertEqual(request.title, "Codex resets in 6 hours")
+        XCTAssertEqual(request.title, "Codex Weekly quota resets in 6 hours")
         XCTAssertEqual(store.state.entries.first?.emittedThresholdMinutes, [24 * 60, 6 * 60])
     }
 
@@ -44,7 +71,7 @@ final class NotificationServiceTests: XCTestCase {
 
         let request = try XCTUnwrap(center.requests.first)
         XCTAssertEqual(center.requests.count, 1)
-        XCTAssertEqual(request.title, "Codex resets in 1 hour")
+        XCTAssertEqual(request.title, "Codex Weekly quota resets in 1 hour")
         XCTAssertEqual(
             store.state.entries.first?.emittedThresholdMinutes,
             [24 * 60, 6 * 60, 60]
@@ -71,7 +98,7 @@ final class NotificationServiceTests: XCTestCase {
         )
 
         let request = try XCTUnwrap(center.requests.first)
-        XCTAssertEqual(request.title, "Codex resets in 1 hour")
+        XCTAssertEqual(request.title, "Codex 5-hour quota resets in 1 hour")
         XCTAssertTrue(request.identifier.hasSuffix(".short.60m"))
         XCTAssertEqual(store.state.entries.first?.emittedThresholdMinutes, [60])
     }
@@ -85,7 +112,7 @@ final class NotificationServiceTests: XCTestCase {
         )
 
         let request = try XCTUnwrap(center.requests.first)
-        XCTAssertEqual(request.title, "Codex resets in 30 minutes")
+        XCTAssertEqual(request.title, "Codex 5-hour quota resets in 30 minutes")
         XCTAssertTrue(request.identifier.hasSuffix(".short.30m"))
         XCTAssertEqual(store.state.entries.first?.emittedThresholdMinutes, [60, 30])
     }
@@ -389,7 +416,7 @@ final class NotificationServiceTests: XCTestCase {
         XCTAssertEqual(center.requests.count, 1)
         XCTAssertTrue(request.identifier.hasPrefix("quotapulse.reset-completed.codex."))
         XCTAssertEqual(request.title, "Codex quota reset")
-        XCTAssertEqual(request.body, "Your 5-hour usage window has refreshed.")
+        XCTAssertEqual(request.body, "Your 5-hour quota has refreshed.")
     }
 
     func testRestartDoesNotDuplicateCompletedResetNotification() async {
@@ -543,7 +570,7 @@ final class NotificationServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(center.requests.count, 1)
-        XCTAssertEqual(center.requests.first?.title, "Codex resets in 6 hours")
+        XCTAssertEqual(center.requests.first?.title, "Codex Weekly quota resets in 6 hours")
         XCTAssertEqual(
             store.state.entries.first?.resetWindowIdentityMinute,
             originalIdentity
@@ -581,7 +608,7 @@ final class NotificationServiceTests: XCTestCase {
         )
 
         let request = try XCTUnwrap(center.requests.first)
-        XCTAssertEqual(request.title, "Codex resets in 6 hours")
+        XCTAssertEqual(request.title, "Codex Weekly quota resets in 6 hours")
         XCTAssertEqual(request.body, "Your quota window is approaching its scheduled reset.")
         XCTAssertFalse(request.body.contains("%"))
     }
@@ -689,7 +716,7 @@ final class NotificationServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(center.requests.count, 1)
-        XCTAssertEqual(center.requests.first?.title, "Claude Code resets in 6 hours")
+        XCTAssertEqual(center.requests.first?.title, "Claude Code Weekly quota resets in 6 hours")
     }
 
     func testDisablingProviderCancelsOnlyThatProvidersPendingQuotaRequests() async {
@@ -1040,8 +1067,8 @@ final class NotificationServiceTests: XCTestCase {
 
         XCTAssertEqual(center.requests.count, 2)
         XCTAssertEqual(Set(center.requests.map(\.title)), [
-            "Codex resets in 6 hours",
-            "Claude Code resets in 6 hours",
+            "Codex Weekly quota resets in 6 hours",
+            "Claude Code Weekly quota resets in 6 hours",
         ])
     }
 
@@ -1059,7 +1086,7 @@ final class NotificationServiceTests: XCTestCase {
         )
 
         let request = try XCTUnwrap(center.requests.first)
-        XCTAssertEqual(request.title, "Codex 將在 1 小時後重置")
+        XCTAssertEqual(request.title, "Codex 5 小時額度將在 1 小時後重置")
         XCTAssertEqual(request.body, "你還有 61% 的配額尚未使用。")
     }
 

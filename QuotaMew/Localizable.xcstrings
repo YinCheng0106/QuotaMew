@@ -1,6 +1,30 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Luna Reserve" : {
+      "comment" : "Product name; intentionally unchanged in all languages.",
+      "shouldTranslate" : false
+    },
+    "Refresh Now" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即重新整理"
+          }
+        }
+      }
+    },
+    "Settings…" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定…"
+          }
+        }
+      }
+    },
     "—" : {
 
     },
@@ -979,13 +1003,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Your %@ has refreshed."
+            "value" : "Your %@ quota has refreshed."
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你的「%@」已重新整理。"
+            "value" : "你的「%@」額度已重置。"
           }
         }
       }
@@ -1024,19 +1048,19 @@
         }
       }
     },
-    "notification.reset.title %@ %@" : {
-      "comment" : "Reset reminder title. The first placeholder is the provider product name; the second is a localized duration.",
+    "notification.reset.title %@ %@ %@" : {
+      "comment" : "Reset reminder title: provider, shared semantic quota-window name, and reminder threshold duration.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ resets in %2$@"
+            "value" : "%1$@ %2$@ quota resets in %3$@"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ 將在 %2$@後重置"
+            "value" : "%1$@ %2$@額度將在 %3$@後重置"
           }
         }
       }
@@ -1824,34 +1848,34 @@
         }
       }
     },
-    "window.description.5-hour" : {
+    "5-hour" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "5-hour usage window"
+            "value" : "5-hour"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "5 小時配額週期"
+            "value" : "5 小時"
           }
         }
       }
     },
-    "window.description.7-day" : {
+    "Weekly" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "7-day usage window"
+            "value" : "Weekly"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "7 天配額週期"
+            "value" : "每週"
           }
         }
       }

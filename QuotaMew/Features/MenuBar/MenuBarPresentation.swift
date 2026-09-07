@@ -68,7 +68,9 @@ struct MenuBarPresentation: Equatable {
         case .disabled, .notConfigured, .notInstalled, .unsupportedAuthentication:
             return nil
         case .loading, .available, .stale, .failed:
-            return state.snapshot?.windows.first { $0.displayUsedPercentage != nil }
+            return ProviderWindowsPresentation(state: state).regularWindows.first {
+                $0.displayUsedPercentage != nil
+            }
         }
     }
 }

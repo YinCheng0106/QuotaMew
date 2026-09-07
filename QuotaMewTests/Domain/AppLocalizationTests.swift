@@ -84,19 +84,17 @@ final class AppLocalizationTests: XCTestCase {
         )
         XCTAssertEqual(
             AppLocalization.resetCompletedBody(
-                windowLabel: "Primary window",
-                duration: .seconds(5 * 60 * 60),
+                windowName: "5-hour",
                 locale: Locale(identifier: "en")
             ),
-            "Your 5-hour usage window has refreshed."
+            "Your 5-hour quota has refreshed."
         )
         XCTAssertEqual(
             AppLocalization.resetCompletedBody(
-                windowLabel: "主要配額週期",
-                duration: .seconds(7 * 24 * 60 * 60),
+                windowName: "每週",
                 locale: Locale(identifier: "zh-Hant-TW")
             ),
-            "你的「7 天配額週期」已重新整理。"
+            "你的「每週」額度已重置。"
         )
     }
 

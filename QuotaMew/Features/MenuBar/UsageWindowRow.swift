@@ -5,6 +5,12 @@ struct UsageWindowRow: View {
 
     let window: UsageWindow
     let mode: UsagePresentationMode
+    let providerID: ProviderID
+    var isCompact = false
+
+    var windowPresentation: UsageWindowPresentation {
+        UsageWindowPresentation(providerID: providerID, window: window)
+    }
 
     private var usage: UsagePresentation {
         UsagePresentation(window: window, mode: mode)
@@ -15,7 +21,7 @@ struct UsageWindowRow: View {
             Divider()
 
             HStack {
-                Text(window.label)
+                Text(windowPresentation.displayName(locale: locale))
                     .font(.subheadline.weight(.medium))
                 Spacer()
                 if let text = usage.text(locale: locale) {
@@ -28,25 +34,32 @@ struct UsageWindowRow: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(windowPresentation.accessibilityLabel(locale: locale))
+            .accessibilityValue(
+                usage.text(locale: locale) ?? AppLocalization.string("Usage unavailable", locale: locale)
+            )
 
-            if let progress = window.progress {
+            if !isCompact, let progress = window.progress {
                 ProgressView(value: progress)
                     .tint(window.progressTint)
                     .accessibilityHidden(true)
             }
 
-            HStack {
-                Spacer()
-                if let resetAt = window.resetAt {
-                    ResetCountdownView(resetAt: resetAt)
-                } else {
-                    Text("Reset time unavailable")
+            if !isCompact {
+                HStack {
+                    Spacer()
+                    if let resetAt = window.resetAt {
+                        ResetCountdownView(resetAt: resetAt)
+                    } else {
+                        Text("Reset time unavailable")
+                    }
                 }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 }
 

@@ -3,6 +3,40 @@ import XCTest
 @testable import QuotaMew
 
 final class CodexProviderTests: XCTestCase {
+    func testObservedReserveBucketMappingKeepsProviderDataAndPresentsRegularQuotaFirst() async throws {
+        // Sanitized metadata shape; all percentages/timestamps below are synthetic.
+        let response = CodexRateLimitsResult(rateLimits: nil, rateLimitsByLimitId: [
+            "base_model_inference": CodexRateLimitBucket(
+                limitId: "base_model_inference", limitName: "gpt-reserve",
+                primary: CodexRateLimitWindow(usedPercent: 10, windowDurationMins: 10_080, resetsAt: 2_000_604_800),
+                secondary: nil
+            ),
+            "codex": CodexRateLimitBucket(
+                limitId: "codex", limitName: nil,
+                primary: CodexRateLimitWindow(usedPercent: 39, windowDurationMins: 300, resetsAt: 2_000_018_000),
+                secondary: CodexRateLimitWindow(usedPercent: 20, windowDurationMins: 10_080, resetsAt: 2_000_604_800)
+            ),
+        ])
+        let reader = CountingReserveReader(response: response)
+        let provider = CodexProvider(reader: reader, now: { Date(timeIntervalSince1970: 2_000_000_000) })
+        let snapshot = try await provider.fetchUsage()
+        let original = snapshot
+        XCTAssertEqual(snapshot.windows.first?.id, "codex.base_model_inference.primary")
+        XCTAssertTrue(snapshot.windows.first?.label.contains("gpt-reserve") == true)
+        let state = ProviderState(providerID: .codex, status: .available, snapshot: snapshot)
+        for _ in 0..<100 {
+            let presentation = ProviderWindowsPresentation(state: state, now: snapshot.capturedAt)
+            XCTAssertEqual(presentation.regularWindows.map(\.id), ["codex.codex.primary", "codex.codex.secondary"])
+            XCTAssertEqual(presentation.reserveWindows.count, 1)
+            XCTAssertFalse(presentation.showsReserveProminently)
+            XCTAssertEqual(UsageWindowPresentation(providerID: .codex, window: snapshot.windows[0])
+                .displayName(locale: Locale(identifier: "en")), "Luna Reserve")
+        }
+        let reads = await reader.readCount
+        XCTAssertEqual(reads, 1, "Rendering must not trigger another provider read")
+        XCTAssertEqual(snapshot, original, "Presentation retains no new snapshot/history and does not mutate domain data")
+    }
+
     @MainActor
     func testDisabledCodexDoesNotReachAppServerReader() async {
         let suiteName = "dev.quotapulse.tests.codex-disabled-reader.\(UUID().uuidString)"
@@ -358,5 +392,17 @@ private actor CountingCodexRateLimitsReader: CodexRateLimitsReading {
     func readRateLimits() async throws -> CodexRateLimitsResult {
         readCount += 1
         return CodexRateLimitsResult(rateLimits: nil, rateLimitsByLimitId: nil)
+    }
+}
+
+private actor CountingReserveReader: CodexRateLimitsReading {
+    let response: CodexRateLimitsResult
+    private(set) var readCount = 0
+
+    init(response: CodexRateLimitsResult) { self.response = response }
+
+    func readRateLimits() async throws -> CodexRateLimitsResult {
+        readCount += 1
+        return response
     }
 }
