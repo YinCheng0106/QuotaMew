@@ -138,10 +138,30 @@ final class SettingsModel {
     }
 
     func setNotificationsEnabled(_ enabled: Bool) async {
-        guard store.areNotificationsEnabled != enabled else { return }
+        if enabled {
+            await enableNotifications()
+            return
+        }
+        guard store.areNotificationsEnabled else { return }
         store.setNotificationsEnabled(enabled)
         await notificationService.preferencesDidChange()
         notificationAuthorizationStatus = await notificationService.authorizationStatus()
+    }
+
+    func enableNotifications() async {
+        if !store.areNotificationsEnabled {
+            store.setNotificationsEnabled(true)
+            await notificationService.preferencesDidChange()
+        }
+        notificationAuthorizationStatus = await notificationService.requestAuthorization()
+    }
+
+    func completeOnboarding() {
+        store.setOnboardingState(.completed)
+    }
+
+    func skipOnboarding() {
+        store.setOnboardingState(.skipped)
     }
 
     func setReminder(

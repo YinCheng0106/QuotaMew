@@ -56,21 +56,53 @@ struct MenuBarRecoveryView: View {
 }
 
 @MainActor
+protocol ApplicationActivationControlling: AnyObject {
+    var activationPolicy: NSApplication.ActivationPolicy { get }
+    func setActivationPolicy(_ policy: NSApplication.ActivationPolicy)
+    func activate()
+}
+
+@MainActor
+private final class SystemApplicationActivationController: ApplicationActivationControlling {
+    var activationPolicy: NSApplication.ActivationPolicy {
+        NSApplication.shared.activationPolicy()
+    }
+
+    func setActivationPolicy(_ policy: NSApplication.ActivationPolicy) {
+        NSApplication.shared.setActivationPolicy(policy)
+    }
+
+    func activate() {
+        NSApplication.shared.activate()
+    }
+}
+
+@MainActor
 final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     typealias ControllerFactory = @MainActor (
         AppModel,
         SettingsModel,
         SettingsSceneRoute
     ) -> any StatusItemControllerLifecycle
+    typealias OnboardingPresenterFactory = @MainActor () -> any OnboardingPresentationHandling
+
+    private enum WindowPresentation: Hashable {
+        case recovery
+        case onboarding
+    }
 
     private let controllerFactory: ControllerFactory
+    private let onboardingPresenterFactory: OnboardingPresenterFactory
+    private let activationController: any ApplicationActivationControlling
     private let terminateApplication: @MainActor () -> Void
     let settingsSceneRoute = SettingsSceneRoute()
     private var appModel: AppModel?
     private var settingsModel: SettingsModel?
     private(set) var statusItemController: (any StatusItemControllerLifecycle)?
     private var recoveryWindowController: NSWindowController?
+    private var onboardingPresenter: (any OnboardingPresentationHandling)?
     private var previousActivationPolicy: NSApplication.ActivationPolicy?
+    private var activeWindowPresentations: Set<WindowPresentation> = []
 
     override convenience init() {
         self.init(
@@ -84,6 +116,8 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
                     }
                 )
             },
+            onboardingPresenterFactory: { OnboardingWindowController() },
+            activationController: SystemApplicationActivationController(),
             terminateApplication: {
                 NSApplication.shared.terminate(nil)
             }
@@ -92,9 +126,15 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
 
     init(
         controllerFactory: @escaping ControllerFactory,
+        onboardingPresenterFactory: @escaping OnboardingPresenterFactory = {
+            OnboardingWindowController()
+        },
+        activationController: any ApplicationActivationControlling = SystemApplicationActivationController(),
         terminateApplication: @escaping @MainActor () -> Void
     ) {
         self.controllerFactory = controllerFactory
+        self.onboardingPresenterFactory = onboardingPresenterFactory
+        self.activationController = activationController
         self.terminateApplication = terminateApplication
         super.init()
     }
@@ -112,6 +152,11 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        onboardingPresenter?.teardown()
+        onboardingPresenter = nil
+        recoveryWindowController?.window?.delegate = nil
+        recoveryWindowController?.close()
+        recoveryWindowController = nil
         statusItemController?.teardown()
         statusItemController = nil
     }
@@ -133,6 +178,13 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
                 appModel: appModel,
                 settingsModel: settingsModel
             )
+            if OnboardingStartupPolicy.shouldPresent(
+                launchSource: launchSource,
+                menuBarDisposition: disposition,
+                onboardingState: settingsModel.store.onboardingState
+            ) {
+                showOnboarding(mode: .firstRun, settingsModel: settingsModel)
+            }
         case .recovery:
             installStatusItemControllerIfNeeded(
                 appModel: appModel,
@@ -148,6 +200,11 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
         _ sender: NSApplication,
         hasVisibleWindows: Bool
     ) -> Bool {
+        if onboardingPresenter?.isPresented == true {
+            onboardingPresenter?.focus()
+            activationController.activate()
+            return false
+        }
         guard let settingsModel else { return false }
         guard MenuBarRecoveryPolicy.shouldPresentRecoveryOnReopen(
             isMenuBarItemVisible: settingsModel.isMenuBarItemVisible
@@ -158,8 +215,20 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
         return false
     }
 
+    func showOnboardingAgain() {
+        guard let settingsModel else { return }
+        guard OnboardingStartupPolicy.shouldPresentManualReplay(
+            isRecoveryPresented: recoveryWindowController?.window?.isVisible == true
+        ) else {
+            recoveryWindowController?.window?.makeKeyAndOrderFront(nil)
+            activationController.activate()
+            return
+        }
+        showOnboarding(mode: .manualReplay, settingsModel: settingsModel)
+    }
+
     func windowWillClose(_ notification: Notification) {
-        endRecoveryPresentation()
+        endWindowPresentation(.recovery)
         recoveryWindowController = nil
         guard settingsModel?.isMenuBarItemVisible == false else { return }
         DispatchQueue.main.async {
@@ -178,10 +247,10 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
     private func showRecoveryWindow(settingsModel: SettingsModel) {
         guard recoveryWindowController == nil else {
             recoveryWindowController?.window?.makeKeyAndOrderFront(nil)
-            NSApplication.shared.activate()
+            activationController.activate()
             return
         }
-        beginRecoveryPresentation()
+        beginWindowPresentation(.recovery)
         let rootView = MenuBarRecoveryView(
             model: settingsModel,
             showInMenuBar: { [weak self] in
@@ -209,23 +278,70 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
         let controller = NSWindowController(window: window)
         recoveryWindowController = controller
         controller.showWindow(nil)
-        NSApplication.shared.activate()
+        activationController.activate()
     }
 
-    private func beginRecoveryPresentation() {
-        guard previousActivationPolicy == nil else { return }
-        let application = NSApplication.shared
-        previousActivationPolicy = application.activationPolicy()
-        if application.activationPolicy() != .regular {
-            application.setActivationPolicy(.regular)
+    private func showOnboarding(
+        mode: OnboardingPresentationMode,
+        settingsModel: SettingsModel
+    ) {
+        let presenter: any OnboardingPresentationHandling
+        if let onboardingPresenter {
+            presenter = onboardingPresenter
+        } else {
+            let newPresenter = onboardingPresenterFactory()
+            onboardingPresenter = newPresenter
+            presenter = newPresenter
+        }
+
+        guard !presenter.isPresented else {
+            presenter.focus()
+            activationController.activate()
+            return
+        }
+
+        beginWindowPresentation(.onboarding)
+        presenter.show(
+            mode: mode,
+            model: settingsModel,
+            action: { [weak self] mode, action in
+                self?.handleOnboardingAction(mode: mode, action: action)
+            },
+            didClose: { [weak self] in
+                self?.endWindowPresentation(.onboarding)
+            }
+        )
+        activationController.activate()
+    }
+
+    private func handleOnboardingAction(
+        mode: OnboardingPresentationMode,
+        action: OnboardingPresentationAction
+    ) {
+        guard mode == .firstRun else { return }
+        switch action {
+        case .complete:
+            settingsModel?.completeOnboarding()
+        case .skip, .close:
+            settingsModel?.skipOnboarding()
         }
     }
 
-    private func endRecoveryPresentation() {
-        guard let previousActivationPolicy else { return }
-        let application = NSApplication.shared
-        if application.activationPolicy() != previousActivationPolicy {
-            application.setActivationPolicy(previousActivationPolicy)
+    private func beginWindowPresentation(_ presentation: WindowPresentation) {
+        guard activeWindowPresentations.insert(presentation).inserted else { return }
+        if previousActivationPolicy == nil {
+            previousActivationPolicy = activationController.activationPolicy
+        }
+        if activationController.activationPolicy != .regular {
+            activationController.setActivationPolicy(.regular)
+        }
+    }
+
+    private func endWindowPresentation(_ presentation: WindowPresentation) {
+        activeWindowPresentations.remove(presentation)
+        guard activeWindowPresentations.isEmpty, let previousActivationPolicy else { return }
+        if activationController.activationPolicy != previousActivationPolicy {
+            activationController.setActivationPolicy(previousActivationPolicy)
         }
         self.previousActivationPolicy = nil
     }

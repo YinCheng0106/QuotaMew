@@ -60,6 +60,63 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertFalse(store.isResetIntelligenceEnabled)
     }
 
+    func testFreshInstallPersistsNeverShownClassificationAcrossRecreation() {
+        let (defaults, suiteName) = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let first = SettingsStore(defaults: defaults)
+        let recreated = SettingsStore(defaults: defaults)
+
+        XCTAssertEqual(first.onboardingState, .neverShown)
+        XCTAssertEqual(first.onboardingLastCompletedVersion, 0)
+        XCTAssertEqual(recreated.onboardingState, .neverShown)
+        XCTAssertEqual(recreated.onboardingLastCompletedVersion, 0)
+        XCTAssertEqual(defaults.string(forKey: "onboarding.state"), "neverShown")
+    }
+
+    func testBetaTwoInstallationWithoutOnboardingStateMigratesToSkipped() {
+        let (defaults, suiteName) = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        // Beta 2 persisted this migration key during SettingsStore initialization.
+        defaults.set(true, forKey: "notifications.short-window.reminder.1h.enabled")
+
+        let store = SettingsStore(defaults: defaults)
+
+        XCTAssertEqual(store.onboardingState, .skipped)
+        XCTAssertEqual(
+            store.onboardingLastCompletedVersion,
+            SettingsStore.currentOnboardingVersion
+        )
+        XCTAssertEqual(defaults.string(forKey: "onboarding.state"), "skipped")
+    }
+
+    func testEarlierInstallationEvidenceWithoutOnboardingStateMigratesToSkipped() {
+        let (defaults, suiteName) = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(Data("{}".utf8), forKey: "notification.deduplication.v1")
+
+        let store = SettingsStore(defaults: defaults)
+
+        XCTAssertEqual(store.onboardingState, .skipped)
+        XCTAssertEqual(
+            store.onboardingLastCompletedVersion,
+            SettingsStore.currentOnboardingVersion
+        )
+    }
+
+    func testPersistedOnboardingStateAndVersionTakePriorityOverMigrationEvidence() {
+        let (defaults, suiteName) = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(OnboardingState.completed.rawValue, forKey: "onboarding.state")
+        defaults.set(7, forKey: "onboarding.last-completed-version")
+        defaults.set(false, forKey: "providers.codex.enabled")
+
+        let store = SettingsStore(defaults: defaults)
+
+        XCTAssertEqual(store.onboardingState, .completed)
+        XCTAssertEqual(store.onboardingLastCompletedVersion, 7)
+    }
+
     func testMenuBarVisibilityPreferenceDoesNotModifyProviderEnablement() {
         let (defaults, suiteName) = makeDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }

@@ -27,6 +27,12 @@ final class NotificationServiceTests: XCTestCase {
             XCTAssertTrue(store.state.entries.isEmpty, "Reserve does not introduce reminder dedup entries")
 
             await service.evaluate([makeState(resetAt: after.addingTimeInterval(3_600), capturedAt: after)], now: after)
+            XCTAssertEqual(center.authorizationRequestCount, 0)
+            XCTAssertTrue(center.requests.isEmpty)
+
+            let authorizationStatus = await service.requestAuthorization()
+            XCTAssertEqual(authorizationStatus, .authorized)
+            await service.evaluate([makeState(resetAt: after.addingTimeInterval(3_600), capturedAt: after)], now: after)
             XCTAssertEqual(center.authorizationRequestCount, 1)
             XCTAssertEqual(center.requests.count, 1)
             XCTAssertTrue(center.requests[0].title.contains("Weekly"))
@@ -153,8 +159,8 @@ final class NotificationServiceTests: XCTestCase {
         XCTAssertEqual(center.requests.count, 1)
     }
 
-    func testConcurrentEvaluationDoesNotDuplicateNotification() async {
-        let (service, center, _) = makeService(status: .notDetermined)
+    func testConcurrentAuthorizedEvaluationDoesNotDuplicateNotification() async {
+        let (service, center, _) = makeService(status: .authorized)
         center.yieldsBeforeReturningAuthorizationStatus = true
         let states = [makeState(resetAfter: 6 * 3_600)]
         let currentDate = now
@@ -168,11 +174,11 @@ final class NotificationServiceTests: XCTestCase {
         await first.value
         await second.value
 
-        XCTAssertEqual(center.authorizationRequestCount, 1)
+        XCTAssertEqual(center.authorizationRequestCount, 0)
         XCTAssertEqual(center.requests.count, 1)
     }
 
-    func testSnapshotThatBecomesStaleWhileAwaitingPermissionDoesNotNotify() async {
+    func testExplicitPermissionRequestDoesNotEvaluateOrDeliverSnapshots() async {
         let clock = TestDateSource(now)
         let center = TestUserNotificationCenter(status: .notDetermined)
         center.onRequestAuthorization = {
@@ -184,11 +190,10 @@ final class NotificationServiceTests: XCTestCase {
             currentDate: { clock.now }
         )
 
-        await service.evaluate(
-            [makeState(resetAfter: 6 * 3_600)],
-            now: now
-        )
+        let status = await service.requestAuthorization()
 
+        XCTAssertEqual(status, .authorized)
+        XCTAssertEqual(center.authorizationRequestCount, 1)
         XCTAssertTrue(center.requests.isEmpty)
     }
 
@@ -1039,7 +1044,7 @@ final class NotificationServiceTests: XCTestCase {
         )
     }
 
-    func testEligibleSnapshotRequestsUndeterminedPermissionOnce() async {
+    func testEligibleSnapshotDoesNotRequestUndeterminedPermission() async {
         let (service, center, _) = makeService(status: .notDetermined)
 
         await service.evaluate(
@@ -1049,6 +1054,16 @@ final class NotificationServiceTests: XCTestCase {
         await service.evaluate(
             [makeState(resetAfter: 6 * 3_600)],
             now: now.addingTimeInterval(60)
+        )
+
+        XCTAssertEqual(center.authorizationRequestCount, 0)
+        XCTAssertTrue(center.requests.isEmpty)
+
+        let authorizationStatus = await service.requestAuthorization()
+        XCTAssertEqual(authorizationStatus, .authorized)
+        await service.evaluate(
+            [makeState(resetAfter: 6 * 3_600)],
+            now: now.addingTimeInterval(120)
         )
 
         XCTAssertEqual(center.authorizationRequestCount, 1)

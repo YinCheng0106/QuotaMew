@@ -327,6 +327,66 @@ final class SettingsIntegrationTests: XCTestCase {
         XCTAssertTrue(model.launchAtLoginUpdateFailed)
     }
 
+    func testRefreshingOnboardingSystemStateDoesNotRequestNotificationAuthorization() async {
+        let (store, defaults, suiteName) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let notifications = SettingsNotificationService(status: .notDetermined)
+        let model = SettingsModel(
+            store: store,
+            appModel: makeAppModel(),
+            notificationService: notifications,
+            launchAtLoginController: SettingsLaunchAtLoginController(status: .disabled)
+        )
+
+        await model.refreshSystemState()
+
+        XCTAssertEqual(model.notificationAuthorizationStatus, .notDetermined)
+        XCTAssertEqual(notifications.authorizationRequestCount, 0)
+    }
+
+    func testExplicitEnableNotificationsUsesSharedPermissionPath() async {
+        let (store, defaults, suiteName) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        store.setNotificationsEnabled(false)
+        let notifications = SettingsNotificationService(status: .notDetermined)
+        let model = SettingsModel(
+            store: store,
+            appModel: makeAppModel(),
+            notificationService: notifications,
+            launchAtLoginController: SettingsLaunchAtLoginController(status: .disabled)
+        )
+
+        await model.enableNotifications()
+
+        XCTAssertTrue(store.areNotificationsEnabled)
+        XCTAssertEqual(notifications.preferencesChangeCount, 1)
+        XCTAssertEqual(notifications.authorizationRequestCount, 1)
+        XCTAssertEqual(model.notificationAuthorizationStatus, .authorized)
+    }
+
+    func testOnboardingCompletionActionsDoNotRequestPermissionOrChangeSettings() {
+        let (store, defaults, suiteName) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let notifications = SettingsNotificationService(status: .notDetermined)
+        let model = SettingsModel(
+            store: store,
+            appModel: makeAppModel(),
+            notificationService: notifications,
+            launchAtLoginController: SettingsLaunchAtLoginController(status: .disabled)
+        )
+        model.setUsagePresentationMode(.used)
+        model.setPinnedProvider(.claude)
+
+        model.skipOnboarding()
+        model.completeOnboarding()
+
+        XCTAssertEqual(store.onboardingState, .completed)
+        XCTAssertEqual(store.usagePresentationMode, .used)
+        XCTAssertEqual(store.pinnedProviderID, .claude)
+        XCTAssertEqual(notifications.authorizationRequestCount, 0)
+        XCTAssertEqual(notifications.preferencesChangeCount, 0)
+    }
+
     func testMenuBarRecoveryActionRequestsInsertion() {
         let (store, defaults, suiteName) = makeStore()
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -550,11 +610,22 @@ private final class SettingsNotificationService: NotificationServicing {
     private(set) var providerTransitions: [ProviderID: Bool] = [:]
     private(set) var evaluationCount = 0
     private(set) var preferencesChangeCount = 0
+    private(set) var authorizationRequestCount = 0
+    private var status: NotificationAuthorizationStatus
+
+    init(status: NotificationAuthorizationStatus = .authorized) {
+        self.status = status
+    }
 
     func evaluate(_ providerStates: [ProviderState], now: Date) async {
         evaluationCount += 1
     }
-    func authorizationStatus() async -> NotificationAuthorizationStatus { .authorized }
+    func authorizationStatus() async -> NotificationAuthorizationStatus { status }
+    func requestAuthorization() async -> NotificationAuthorizationStatus {
+        authorizationRequestCount += 1
+        status = .authorized
+        return status
+    }
     func preferencesDidChange() async {
         preferencesChangeCount += 1
     }

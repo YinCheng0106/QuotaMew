@@ -1,30 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Luna Reserve" : {
-      "comment" : "Product name; intentionally unchanged in all languages.",
-      "shouldTranslate" : false
-    },
-    "Refresh Now" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "立即重新整理"
-          }
-        }
-      }
-    },
-    "Settings…" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "設定…"
-          }
-        }
-      }
-    },
     "—" : {
 
     },
@@ -44,6 +20,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提前 1 小時提醒"
+          }
+        }
+      }
+    },
+    "5-hour" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5-hour"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "5 小時"
           }
         }
       }
@@ -94,6 +86,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提前 30 分鐘提醒"
+          }
+        }
+      }
+    },
+    "App Behavior" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 行為"
           }
         }
       }
@@ -178,6 +180,16 @@
         }
       }
     },
+    "Checking status…" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在檢查狀態…"
+          }
+        }
+      }
+    },
     "Claude Code" : {
 
     },
@@ -221,6 +233,16 @@
         }
       }
     },
+    "Close" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關閉"
+          }
+        }
+      }
+    },
     "Codex" : {
       "shouldTranslate" : false
     },
@@ -254,6 +276,16 @@
         }
       }
     },
+    "Configured" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已設定"
+          }
+        }
+      }
+    },
     "Connected" : {
       "localizations" : {
         "zh-Hant" : {
@@ -281,6 +313,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "複製診斷資訊"
+          }
+        }
+      }
+    },
+    "Detected" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已偵測"
           }
         }
       }
@@ -458,6 +500,16 @@
         }
       }
     },
+    "Enable Notifications" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "啟用通知"
+          }
+        }
+      }
+    },
     "Enable reset notifications" : {
       "localizations" : {
         "zh-Hant" : {
@@ -518,6 +570,16 @@
         }
       }
     },
+    "Experimental / Unverified" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "實驗性功能／尚未驗證"
+          }
+        }
+      }
+    },
     "Failed" : {
       "localizations" : {
         "zh-Hant" : {
@@ -534,6 +596,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一般"
+          }
+        }
+      }
+    },
+    "Get Started" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始使用"
           }
         }
       }
@@ -606,6 +678,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "整合尚未設定"
+          }
+        }
+      }
+    },
+    "Keep track of your AI coding quota from the menu bar." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從選單列掌握 AI 程式開發工具的配額。"
           }
         }
       }
@@ -763,6 +845,10 @@
         }
       }
     },
+    "Luna Reserve" : {
+      "comment" : "Product name; intentionally unchanged in all languages.",
+      "shouldTranslate" : false
+    },
     "macOS may also control visibility in System Settings." : {
       "localizations" : {
         "zh-Hant" : {
@@ -774,6 +860,7 @@
       }
     },
     "macOS will ask for permission when the first reminder is ready." : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hant" : {
           "stringUnit" : {
@@ -986,6 +1073,16 @@
         }
       }
     },
+    "Notification permission is requested only when you choose Enable Notifications." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只有在你選擇「啟用通知」時，才會要求通知權限。"
+          }
+        }
+      }
+    },
     "Notification permission was not granted." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1085,6 +1182,16 @@
         }
       }
     },
+    "Notifications are enabled." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知已啟用。"
+          }
+        }
+      }
+    },
     "Notifications are unavailable." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1142,6 +1249,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "主要配額週期"
+          }
+        }
+      }
+    },
+    "Privacy" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隱私權"
           }
         }
       }
@@ -1209,6 +1326,16 @@
     "QuotaMew" : {
       "shouldTranslate" : false
     },
+    "QuotaMew does not intentionally upload prompts, project or source paths, account identifiers, credentials, usage history, or device identifiers." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QuotaMew 不會刻意上傳提示內容、專案或原始碼路徑、帳號識別資訊、憑證、使用記錄或裝置識別資訊。"
+          }
+        }
+      }
+    },
     "QuotaMew is currently hidden from the menu bar." : {
       "localizations" : {
         "zh-Hant" : {
@@ -1225,6 +1352,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "QuotaMew 已隱藏"
+          }
+        }
+      }
+    },
+    "QuotaMew processes quota information locally." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QuotaMew 會在本機處理配額資訊。"
           }
         }
       }
@@ -1255,6 +1392,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要重新整理"
+          }
+        }
+      }
+    },
+    "Refresh Now" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即重新整理"
           }
         }
       }
@@ -1325,6 +1472,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在取得目前的配額資訊。"
+          }
+        }
+      }
+    },
+    "Requests macOS notification permission." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向 macOS 要求通知權限。"
           }
         }
       }
@@ -1480,6 +1637,16 @@
         }
       }
     },
+    "Settings…" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定…"
+          }
+        }
+      }
+    },
     "Short windows (up to 6 hours)" : {
       "localizations" : {
         "zh-Hant" : {
@@ -1511,6 +1678,16 @@
         }
       }
     },
+    "Show Onboarding Again" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次顯示首次使用說明"
+          }
+        }
+      }
+    },
     "Show QuotaMew in Menu Bar" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1538,6 +1715,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在顯示先前取得的使用量。"
+          }
+        }
+      }
+    },
+    "Skip" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "略過"
           }
         }
       }
@@ -1838,32 +2025,6 @@
         }
       }
     },
-    "Weekly window" : {
-      "localizations" : {
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每週配額週期"
-          }
-        }
-      }
-    },
-    "5-hour" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "5-hour"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "5 小時"
-          }
-        }
-      }
-    },
     "Weekly" : {
       "localizations" : {
         "en" : {
@@ -1876,6 +2037,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每週"
+          }
+        }
+      }
+    },
+    "Weekly window" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每週配額週期"
+          }
+        }
+      }
+    },
+    "Welcome to QuotaMew" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歡迎使用 QuotaMew"
           }
         }
       }

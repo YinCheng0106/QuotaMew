@@ -78,6 +78,8 @@ final class SettingsStore: AppPreferencesProviding {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        let hasPersistedOnboardingState = defaults.object(forKey: Key.onboardingState) != nil
+        let isEstablishedInstallation = Self.hasPreOnboardingInstallationEvidence(defaults)
         isMenuBarItemRequested = Self.bool(
             defaults,
             key: Key.menuBarItemRequested,
@@ -120,10 +122,35 @@ final class SettingsStore: AppPreferencesProviding {
             defaultValue: .remaining
         )
         pinnedProviderRawValue = defaults.string(forKey: Key.pinnedProvider)
-        onboardingState = Self.enumValue(defaults, key: Key.onboardingState, defaultValue: .neverShown)
-        onboardingLastCompletedVersion = defaults.object(forKey: Key.onboardingLastCompletedVersion) == nil
-            ? 0
-            : defaults.integer(forKey: Key.onboardingLastCompletedVersion)
+        if hasPersistedOnboardingState {
+            onboardingState = Self.enumValue(
+                defaults,
+                key: Key.onboardingState,
+                defaultValue: .neverShown
+            )
+            onboardingLastCompletedVersion = defaults.object(
+                forKey: Key.onboardingLastCompletedVersion
+            ) == nil ? 0 : defaults.integer(forKey: Key.onboardingLastCompletedVersion)
+        } else if isEstablishedInstallation {
+            // Milestone A froze the rule that an update must not interrupt an
+            // established user. Persist the existing skipped state so this
+            // one-time classification remains stable on future launches.
+            onboardingState = .skipped
+            let migratedVersion = Self.currentOnboardingVersion
+            onboardingLastCompletedVersion = migratedVersion
+            defaults.set(OnboardingState.skipped.rawValue, forKey: Key.onboardingState)
+            defaults.set(
+                migratedVersion,
+                forKey: Key.onboardingLastCompletedVersion
+            )
+        } else {
+            // Persisting the default distinguishes a fresh Beta 3 install from
+            // an older install after the rest of this initializer writes its
+            // existing migration defaults.
+            onboardingState = .neverShown
+            onboardingLastCompletedVersion = 0
+            defaults.set(OnboardingState.neverShown.rawValue, forKey: Key.onboardingState)
+        }
         isResetIntelligenceEnabled = Self.bool(defaults, key: Key.resetIntelligenceEnabled, defaultValue: false)
     }
 
@@ -238,5 +265,27 @@ final class SettingsStore: AppPreferencesProviding {
             return defaultValue
         }
         return value
+    }
+
+    private static func hasPreOnboardingInstallationEvidence(_ defaults: UserDefaults) -> Bool {
+        let keys = [
+            Key.menuBarItemRequested,
+            Key.codexEnabled,
+            Key.claudeEnabled,
+            Key.notificationsEnabled,
+            Key.reminder24HoursEnabled,
+            Key.reminder6HoursEnabled,
+            Key.reminder1HourEnabled,
+            Key.shortWindowReminder1HourEnabled,
+            Key.shortWindowReminder30MinutesEnabled,
+            Key.usagePresentationMode,
+            Key.pinnedProvider,
+            Key.onboardingLastCompletedVersion,
+            Key.resetIntelligenceEnabled,
+            "notification.deduplication.v1",
+            "notification.deduplication.v1.local-reset.v1",
+            "notification.deduplication.v1.provider-lifecycle.v1",
+        ]
+        return keys.contains { defaults.object(forKey: $0) != nil }
     }
 }

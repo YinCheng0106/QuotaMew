@@ -189,6 +189,29 @@ final class AppLocalizationTests: XCTestCase {
         )
     }
 
+    func testOnboardingUsesSupportedLanguages() {
+        let traditionalChinese = Locale(identifier: "zh-Hant-TW")
+        let expected: [(String.LocalizationValue, String, String)] = [
+            ("App Behavior", "App Behavior", "App 行為"),
+            ("Checking status…", "Checking status…", "正在檢查狀態…"),
+            ("Close", "Close", "關閉"),
+            ("Configured", "Configured", "已設定"),
+            ("Detected", "Detected", "已偵測"),
+            ("Enable Notifications", "Enable Notifications", "啟用通知"),
+            ("Experimental / Unverified", "Experimental / Unverified", "實驗性功能／尚未驗證"),
+            ("Get Started", "Get Started", "開始使用"),
+            ("Privacy", "Privacy", "隱私權"),
+            ("Show Onboarding Again", "Show Onboarding Again", "再次顯示首次使用說明"),
+            ("Skip", "Skip", "略過"),
+            ("Welcome to QuotaMew", "Welcome to QuotaMew", "歡迎使用 QuotaMew"),
+        ]
+
+        for (key, english, value) in expected {
+            XCTAssertEqual(AppLocalization.string(key, locale: traditionalChinese), value)
+            XCTAssertEqual(AppLocalization.string(key, locale: Locale(identifier: "en")), english)
+        }
+    }
+
     func testDiagnosticsUIUsesSupportedLanguages() {
         XCTAssertEqual(
             AppLocalization.string("Diagnostics", locale: Locale(identifier: "en")),

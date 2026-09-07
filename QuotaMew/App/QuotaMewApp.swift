@@ -19,7 +19,11 @@ struct QuotaMewApp: App {
     var body: some Scene {
         let _ = configureSettingsRoute()
         Settings {
-            SettingsView(model: runtime.settingsModel, appModel: runtime.appModel)
+            SettingsView(
+                model: runtime.settingsModel,
+                appModel: runtime.appModel,
+                showOnboarding: { applicationDelegate.showOnboardingAgain() }
+            )
         }
     }
 

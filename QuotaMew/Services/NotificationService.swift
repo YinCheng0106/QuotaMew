@@ -6,6 +6,7 @@ protocol NotificationServicing: AnyObject {
     func prepareForLaunch()
     func evaluate(_ providerStates: [ProviderState], now: Date) async
     func authorizationStatus() async -> NotificationAuthorizationStatus
+    func requestAuthorization() async -> NotificationAuthorizationStatus
     func preferencesDidChange() async
     func providerEnablementDidChange(
         _ providerID: ProviderID,
@@ -21,6 +22,9 @@ protocol NotificationServicing: AnyObject {
 extension NotificationServicing {
     func prepareForLaunch() {}
     func authorizationStatus() async -> NotificationAuthorizationStatus { .notDetermined }
+    func requestAuthorization() async -> NotificationAuthorizationStatus {
+        await authorizationStatus()
+    }
     func preferencesDidChange() async {}
     func providerEnablementDidChange(
         _ providerID: ProviderID,
@@ -208,11 +212,13 @@ final class NotificationService: NotificationServicing {
         guard !evaluation.decisions.isEmpty || !deliverableResets.isEmpty else {
             return
         }
-        guard (try? await isAuthorized(requestIfNeeded: true)) == true else { return }
+        // A refresh is never permission UI. Authorization is requested only by
+        // an explicit user action in Settings or Onboarding.
+        guard (try? await isAuthorized(requestIfNeeded: false)) == true else { return }
         guard generation == evaluationGeneration, !Task.isCancelled else { return }
 
-        // Authorization may leave the task suspended while the user decides. Re-run the
-        // policy so a newer evaluation, a passed reset, or newly stale usage cannot send.
+        // Notification-center calls may suspend. Re-run the policy so a newer
+        // evaluation, a passed reset, or newly stale usage cannot send.
         let elapsed = max(currentDate().timeIntervalSince(evaluationStartedAt), 0)
         let deliveryNow = now.addingTimeInterval(elapsed)
         let validDeliveryStates = enabledStates.filter {
@@ -285,6 +291,11 @@ final class NotificationService: NotificationServicing {
 
     func authorizationStatus() async -> NotificationAuthorizationStatus {
         await center.authorizationStatus()
+    }
+
+    func requestAuthorization() async -> NotificationAuthorizationStatus {
+        _ = try? await isAuthorized(requestIfNeeded: true)
+        return await center.authorizationStatus()
     }
 
     func preferencesDidChange() async {

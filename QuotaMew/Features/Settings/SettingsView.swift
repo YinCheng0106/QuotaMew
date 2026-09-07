@@ -3,10 +3,15 @@ import SwiftUI
 struct SettingsView: View {
     let model: SettingsModel
     let appModel: AppModel
+    let showOnboarding: @MainActor () -> Void
 
     var body: some View {
         TabView {
-            GeneralSettingsPage(model: model, appModel: appModel)
+            GeneralSettingsPage(
+                model: model,
+                appModel: appModel,
+                showOnboarding: showOnboarding
+            )
                 .tabItem { Label("General", systemImage: "gearshape") }
             ProviderSettingsPage(model: model)
                 .tabItem { Label("Providers", systemImage: "rectangle.3.group") }
@@ -26,6 +31,7 @@ private struct GeneralSettingsPage: View {
 
     let model: SettingsModel
     let appModel: AppModel
+    let showOnboarding: @MainActor () -> Void
 
     var body: some View {
         Form {
@@ -38,6 +44,9 @@ private struct GeneralSettingsPage: View {
                     .disabled(model.isUpdatingLaunchAtLogin || model.launchAtLoginStatus == .requiresApproval)
                 launchAtLoginStatus
                 LabeledContent("Background refresh") { Text("Every 15 minutes") }
+                Button("Show Onboarding Again", systemImage: "questionmark.circle") {
+                    showOnboarding()
+                }
             }
 
             Section("Display") {
@@ -200,7 +209,10 @@ private struct NotificationSettingsPage: View {
         case .denied:
             Label("Notifications are disabled in System Settings.", systemImage: "bell.slash").foregroundStyle(.secondary)
         case .notDetermined where model.store.areNotificationsEnabled:
-            Text("macOS will ask for permission when the first reminder is ready.").foregroundStyle(.secondary)
+            Button("Enable Notifications", systemImage: "bell.badge") {
+                Task { await model.enableNotifications() }
+            }
+            .accessibilityHint("Requests macOS notification permission.")
         case .authorized, .notDetermined:
             EmptyView()
         }
@@ -249,7 +261,16 @@ private struct DiagnosticsSection: View {
 #Preview("Settings") {
     let appModel = AppDependencies.makePreviewModel()
     let store = SettingsStore(defaults: UserDefaults(suiteName: "SettingsPreview")!)
-    SettingsView(model: SettingsModel(store: store, appModel: appModel, notificationService: PreviewSettingsNotificationService(), launchAtLoginController: PreviewLaunchAtLoginController()), appModel: appModel)
+    SettingsView(
+        model: SettingsModel(
+            store: store,
+            appModel: appModel,
+            notificationService: PreviewSettingsNotificationService(),
+            launchAtLoginController: PreviewLaunchAtLoginController()
+        ),
+        appModel: appModel,
+        showOnboarding: {}
+    )
 }
 
 @MainActor private final class PreviewSettingsNotificationService: NotificationServicing {
