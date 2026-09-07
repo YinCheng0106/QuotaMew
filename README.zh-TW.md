@@ -43,14 +43,14 @@ ChatGPT.app 支援依賴未文件化的封裝細節：內附 Codex runtime 的�
 
 ### 下載 Beta 版本
 
-目前可下載的 v0.2.0 Beta 1 是以更名前的 QuotaPulse 名稱公開發行的版本。
+目前公開版本為 **QuotaMew v0.2.0 Beta 2**。Beta 1 以先前的 QuotaPulse 名稱發行，其歷史發行紀錄與產物保留原名。
 
-請從 [GitHub Releases](https://github.com/YinCheng0106/QuotaPulse/releases) 下載最新的 DMG。
+請從 [GitHub Releases](https://github.com/YinCheng0106/QuotaMew/releases) 下載最新的 DMG。
 
 1. 下載最新的 `.dmg`。
 2. 開啟磁碟映像檔。
-3. 將已發行的 QuotaPulse App 拖曳到 Applications（應用程式）資料夾。
-4. 從 Applications 開啟已發行的 QuotaPulse App。
+3. 將 QuotaMew 拖曳到 Applications（應用程式）資料夾。
+4. 從 Applications 開啟 QuotaMew。
 
 完整安裝與首次啟動方式請參閱 [QuotaMew 文件](https://quotamew.yincheng.app/zh-TW/docs/installation)。
 
@@ -72,7 +72,7 @@ cd QuotaMew
 open QuotaMew.xcodeproj
 ```
 
-上述 `QuotaMew` GitHub URL 是預定的正式 repository URL，需待外部完成 repository rename 後才會解析。
+產品與 repository 更名已完成；相容性敏感的內部識別碼刻意保留原命名空間。
 
 在 Xcode 選擇 `QuotaMew` scheme 與 **My Mac**，再選擇 **Product → Run**。如果 Xcode 要求設定本機開發用 team，請在 Signing & Capabilities 選擇自己的 team；這不代表已完成散布用的 Developer ID 簽章。
 
@@ -97,7 +97,7 @@ QuotaMew 會尋找相容的 Codex 執行檔，優先使用 ChatGPT.app 內附的
 
 ## 通知
 
-取得新鮮的 provider 資料，且剩餘額度至少為 20% 時，QuotaMew 會透過 macOS `UserNotifications` 在本機排定重設提醒。短額度視窗可在 1 小時與 30 分鐘前提醒；長視窗則可在門檻未超過視窗長度時，於 24 小時、6 小時與 1 小時前提醒。你可以在「設定」中關閉全部通知或個別門檻。
+取得新鮮的 provider 資料後，QuotaMew 會透過 macOS `UserNotifications` 在本機排定重設提醒。剩餘額度至少為 20% 時附上剩餘百分比，否則使用一般重設提醒。短額度視窗可在 1 小時與 30 分鐘前提醒；長視窗則可在門檻未超過視窗長度時，於 24 小時、6 小時與 1 小時前提醒。你可以在「設定」中關閉全部通知或個別門檻。
 
 QuotaMew 也會在每次刷新後比對有上限的 normalized provider 狀態，判斷 quota window 是否真正進入新 cycle，並在該視窗完成重設時最多通知一次。單純 percentage 下降不計為 reset，persisted cycle identity 也會避免 App restart 後重複通知。官方外部 Reset Intelligence feed 仍是未來階段；詳見 [docs/RESET_INTELLIGENCE.md](docs/RESET_INTELLIGENCE.md)。
 
@@ -132,12 +132,18 @@ QuotaMew 優先採用事件驅動更新、保守的刷新週期、有上限的 p
 - 已在 Apple silicon 驗證；Intel Mac 尚未驗證
 - ChatGPT.app Codex runtime 探索依賴未文件化的 bundle 路徑
 - Claude Code 支援為 Experimental / Unverified
-- v0.1.1 為 source-only release；可下載 binary 的散布驗證尚未完成
+- 目前 Beta DMG 尚無 Developer ID 簽章與 Apple 公證
 - 沒有用量歷史與雲端同步
 - 沒有 iPhone App
 - 尚未實作官方外部 Reset Intelligence feed 擷取
 
 ## 路線圖
+
+尚未發行的 Product Polish 原始碼依精確的正規化 duration，讓 Dashboard、VoiceOver 與通知共用「**5 小時／每週**」名稱；未知長度採安全的通用名稱。**Luna Reserve** 平常以次要精簡列呈現，只有新鮮、有效的一般 Codex 視窗耗盡時才展開。這是顯示規則，不代表 Reserve 已啟用或保證可用；它不取代選單列的一般額度，也不發送重設通知。
+
+左鍵維持切換 Dashboard；右鍵開啟原生選單，提供「**立即重新整理**」、「**設定…**」與「**退出 QuotaMew**」，沿用既有刷新、Settings scene 與正常結束流程。
+
+Milestone A／B 已完成。**Milestone C — Onboarding 仍為 v0.2 必要項目，目前僅有持久化合約，尚未實作 UI。** Beta 3 尚未發行。順序為 Onboarding 與 Product Polish 驗收 → Beta 3 準備 → release hardening → RC 1 → v0.2.0。外部 Reset Intelligence feed／network／matching 工作移至 v0.3。詳見 [v0.2 計畫](docs/V0_2_PLAN.md) 與[人工驗收清單](docs/RUNTIME_TESTING.md#v02-product-polish-acceptance)。
 
 QuotaMew 現已包含本機 reset-cycle detection。未來可能進行經審查的 Claude Code opt-in bridge、更廣泛的 provider 與硬體驗證、簽章與 notarization，以及保留來源連結的官方 Reset Intelligence feed 擷取；這些未來項目都不是目前已實作功能。詳情請參閱 [ROADMAP.md](ROADMAP.md)。
 

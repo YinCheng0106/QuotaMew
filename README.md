@@ -43,14 +43,14 @@ ChatGPT.app support relies on an undocumented packaging detail: the bundled Code
 
 ### Download the beta
 
-The currently downloadable v0.2.0 Beta 1 was released publicly under the previous QuotaPulse name.
+The current public release is **QuotaMew v0.2.0 Beta 2**. Beta 1 was released under the previous QuotaPulse name; its historical release records and artifacts retain that name.
 
-Download the latest DMG from the [GitHub Releases](https://github.com/YinCheng0106/QuotaPulse/releases) page.
+Download the latest DMG from the [GitHub Releases](https://github.com/YinCheng0106/QuotaMew/releases) page.
 
 1. Download the latest `.dmg`.
 2. Open the disk image.
-3. Drag the released QuotaPulse app into Applications.
-4. Launch the released QuotaPulse app from Applications.
+3. Drag QuotaMew into Applications.
+4. Launch QuotaMew from Applications.
 
 For detailed installation and first-launch instructions, see the [QuotaMew documentation](https://quotamew.yincheng.app/docs/installation).
 
@@ -72,7 +72,7 @@ cd QuotaMew
 open QuotaMew.xcodeproj
 ```
 
-The `QuotaMew` GitHub URL is the intended canonical repository URL and will resolve after the external repository rename is completed.
+The product and repository rename is complete. Compatibility-sensitive internal identifiers intentionally retain the previous namespace.
 
 In Xcode, select the `QuotaMew` scheme and **My Mac**, then choose **Product → Run**. If Xcode requests a development team for a local build, select your own team in Signing & Capabilities; this does not constitute Developer ID signing for distribution.
 
@@ -97,7 +97,7 @@ Codex remains responsible for authentication. QuotaMew does not read or copy `~/
 
 ## Notifications
 
-Reset reminders are scheduled locally through macOS `UserNotifications` after a fresh provider refresh when at least 20% of the quota remains. Short quota windows can notify at 1 hour and 30 minutes; long windows can notify at 24 hours, 6 hours, and 1 hour when the threshold fits the window. Notifications can be disabled globally or by threshold in Settings.
+Reset reminders are scheduled locally through macOS `UserNotifications` after a fresh provider refresh. When at least 20% remains, the reminder includes the remaining percentage; otherwise it uses a simple reset reminder. Short quota windows can notify at 1 hour and 30 minutes; long windows can notify at 24 hours, 6 hours, and 1 hour when the threshold fits the window. Notifications can be disabled globally or by threshold in Settings.
 
 QuotaMew also compares bounded normalized provider state across refreshes to detect a genuine new quota cycle and can notify once when that window has refreshed. Percentage decreases alone do not count as resets, and persisted cycle identity prevents duplicate notifications after restart. Official external Reset Intelligence feeds are a future phase; see [docs/RESET_INTELLIGENCE.md](docs/RESET_INTELLIGENCE.md).
 
@@ -132,12 +132,18 @@ Do not attach raw app-server output, Codex session files, authentication files, 
 - Validated on Apple silicon; Intel Macs are not yet validated
 - ChatGPT.app Codex runtime discovery depends on an undocumented bundle path
 - Claude Code support is Experimental / Unverified
-- v0.1.1 is source-only; downloadable binary distribution is not yet validated
+- The current beta DMG has no Developer ID signing or Apple notarization
 - No usage history or cloud sync
 - No iPhone app
 - Official external Reset Intelligence feed ingestion is not implemented
 
 ## Roadmap
+
+The unreleased Product Polish source uses shared **5-hour / Weekly** window names in Dashboard, VoiceOver, and notifications, based on exact normalized durations. Unknown durations use a safe generic name. **Luna Reserve** appears as a compact secondary row while regular Codex quota is usable; it expands when a fresh, valid regular window is exhausted. This is a display rule, not a claim that Reserve is active or usable. Reserve never replaces the regular menu-bar metric and does not send reset notifications.
+
+Left-click toggles Dashboard. Right-click opens a native menu with **Refresh Now**, **Settings…**, and **Quit QuotaMew**, using the existing refresh, Settings scene, and normal termination paths.
+
+Milestones A and B are complete. **Milestone C — Onboarding remains required for v0.2 and is not implemented beyond its persistence contract.** Beta 3 is not released. Next: Onboarding and Product Polish acceptance → Beta 3 preparation → release hardening → RC 1 → v0.2.0. External Reset Intelligence feed/network/matching work is planned for v0.3. See [the v0.2 plan](docs/V0_2_PLAN.md) and [manual acceptance checklist](docs/RUNTIME_TESTING.md#v02-product-polish-acceptance).
 
 QuotaMew now includes local reset-cycle detection. Future work may include a reviewed Claude Code opt-in bridge, broader provider and hardware validation, signed/notarized distribution, and source-linked official Reset Intelligence feed ingestion. These future items are not implemented claims. See [ROADMAP.md](ROADMAP.md).
 

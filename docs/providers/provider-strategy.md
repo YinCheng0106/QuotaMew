@@ -75,7 +75,7 @@ QuotaMew 的資料來源必須同時滿足：
 
 **Fallback source**
 
-保存上次成功取得的 QuotaPulse-owned normalized snapshot。若新查詢 timeout、offline 或暫時失敗，顯示 last-known values、capture time 與 `stale`。在 snapshot 不存在時顯示 unavailable。
+保留上次成功取得的 QuotaMew-owned normalized snapshot 於記憶體。若新查詢 timeout、offline 或暫時失敗，顯示 last-known values、capture time 與 `stale`。在 snapshot 不存在時顯示 unavailable。
 
 Codex session JSONL 不應作 production fallback。它只能列為未來的 explicit experimental investigation，且只有官方 contract 長期無法使用時才重新評估。
 

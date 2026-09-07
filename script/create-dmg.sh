@@ -7,7 +7,7 @@ VERSION="${1:-}"
 
 if [ -z "$VERSION" ]; then
   echo "Usage:"
-  echo "  ./scripts/create-dmg.sh 0.2.0-beta.2"
+  echo "  ./script/create-dmg.sh <version>"
   exit 1
 fi
 
