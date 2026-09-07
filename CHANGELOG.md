@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- Share duration-based 5-hour / Weekly window names across Dashboard, VoiceOver, and reset notifications, with a safe generic fallback.
+- Present Luna Reserve as secondary fallback information, expanding it only for fresh regular-quota exhaustion; keep regular quota as the menu-bar metric and suppress Reserve reset notifications.
+- Add a native status-item right-click menu for Refresh Now, Settings…, and Quit QuotaMew through existing application actions.
+- Correct current Beta 2 download instructions and document the v0.2 Onboarding and Product Polish acceptance gates. External Reset Intelligence reader/network/matching work is deferred to v0.3.
+
+These source changes are not a Beta 3 release. Application version/build metadata remains 0.2.0 (2) pending the release preparation task.
+
 ## [0.2.0-beta.2] - 2026-09-06
 
 ### Changed

@@ -2,6 +2,8 @@
 
 本路線圖以成果為導向。在平臺基準與即時 provider 整合驗證完成前，刻意不承諾日期。
 
+目前公開版為 **QuotaMew v0.2.0-beta.2**。以下歷史 milestone／strategy records 保留原決策；目前 scope 以本文最後的 **2026-09-07 v0.2 規劃決策**及 [V0_2_PLAN.md](docs/V0_2_PLAN.md) 為準。
+
 ## Milestone 0 — 規劃基準
 
 狀態：已完成
@@ -226,16 +228,20 @@ QuotaMew 的主要定位是 **重視隱私的 AI coding 額度選單列工具**�
 
 不採用 custom updater、credential／cookie access、transcript scanning、automatic provider rotation 或以 `xattr` 移除 quarantine 作為正式散布方案。
 
-## v0.2 規劃決策（2026-08-31）
+## v0.2 規劃決策（2026-09-07）
 
-> 本節是在 v0.1.1 source-only 公開發行後作出的最新規劃，優先於上方較早的 post-v0.1 建議；歷史 v0.1 milestone 保留不改寫。
+> 本節取代 2026-08-31 的 feed-inclusive v0.2 scope，優先於上方較早的 post-v0.1 建議；歷史 v0.1 milestone 保留不改寫。
 
-v0.2 的主定位改為 **reset-aware AI coding quota assistant**，並維持隱私優先的本機額度視圖與可追溯來源作為兩項次要差異點。範圍只含三個工作流：
+v0.2 聚焦 **隱私優先的本機額度工具與原生使用體驗**：
 
-1. Remaining／Used presentation、固定 pinned provider、以及 General／Providers／Notifications Settings 結構。
-2. 可略過、可重看的單頁 onboarding，重用既有 detection/diagnostics，不做 provider setup installer。
-3. 人工審核、GitHub-hosted static `ResetEvent` feed 的 ingestion；包含 source URL、publisher、publication/retrieval/effective time、verification、revision 與 correction/retraction，不做 collector、backend 或 AI 自動發布。
+1. **A／B COMPLETE**：保留 frozen contracts、Hybrid NSStatusItem、Remaining／Used、pin、Settings、lifecycle/recovery 與已完成的 QuotaMew 更名。
+2. **C REQUIRED／UI NOT STARTED**：可略過、可重看的單頁 Onboarding，重用既有 detection/diagnostics/persistence，不做 provider setup installer。
+3. **Product Polish source implemented／manual acceptance pending**：共用 5 小時／每週名稱、Luna Reserve 次要呈現、原生右鍵選單、公開文件修正與 beta feedback。
 
-local completed-reset notification、Diagnostics、disabled-provider lifecycle 與 MenuBar recovery 都已在 v0.1.1 完成，v0.2 只維持 regression/系統驗證，不能重新包裝成新功能。Claude 維持 Experimental / Unverified，直到有符合資格的實際帳號及可逆 bridge setup 的完整驗證。更新檢查、Sparkle、自動更新、Gemini/OpenCode provider、burn-rate/history/charts、AppKit secondary-click shell 與 binary distribution 全部不納入 v0.2。
+Local completed-reset notification、Diagnostics、disabled-provider lifecycle 與 MenuBar recovery 保持既有行為。Claude 維持 Experimental / Unverified；更新檢查、Sparkle、自動更新、Gemini/OpenCode、burn-rate/history/charts 不納入本次工作。
+
+**原 D/E 的外部 feed reader/network/cache/service 與 event/local matching 移至 v0.3**；保留 Milestone A 合約與 fixtures，不實作外部來源功能。
+
+版本順序：**C + Product Polish acceptance → v0.2.0-beta.3 → release hardening → v0.2.0-rc.1 → v0.2.0**。目前只有 Beta 2 已公開提供 DMG；Beta 3 尚未發行，Developer ID signing 與 notarization 仍未完成。本次不提交、推送、tag、打包或發布。
 
 完整候選評估、架構、驗收條件與實作順序見 [`docs/V0_2_PLAN.md`](docs/V0_2_PLAN.md)。

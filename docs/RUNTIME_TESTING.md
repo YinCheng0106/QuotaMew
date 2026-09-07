@@ -2,6 +2,37 @@
 
 本文件是 QuotaMew v0.1 的人工 runtime 測試手冊。目標是找出長時間執行、反覆刷新、重連、Settings／menu lifecycle 與通知流程中的累積問題；不是用單元測試取代 soak test，也不是用單一記憶體讀數判定 memory leak。
 
+## v0.2 Product Polish acceptance
+
+2026-09-07 新增；以下均為**待人工驗收**，不因 XCTest/build 通過而勾選。Public release 仍是 Beta 2，工作樹是未發行 source。先以正常 Quit 結束既有測試 App，再從 Finder／LaunchServices 啟動唯一一份 fresh Debug app bundle；不要執行裸 Mach-O。既有長時間 runtime 手冊與下方歷史 Milestone B 證據繼續適用。
+
+| # | 檢查 | 結果 |
+| --- | --- | --- |
+| 1 | 一般 Codex 顯示「5 小時／每週」；英文「5-hour／Weekly」 | 待驗 |
+| 2 | 一般視窗不顯示「主要配額週期／次要配額週期」 | 待驗 |
+| 3 | UI 沒有 raw gpt-reserve 或 base_model_inference | 待驗 |
+| 4 | Reserve 平常為精簡次要列；新鮮一般額度恰為 100% used 且 reset 未到期才展開；stale／缺值不展開 | 待驗 |
+| 5 | Remaining／Used 與 pin 切換正常，Reserve 不取代 status item 的一般百分比 | 待驗 |
+| 6 | 倒數正確且與名稱分開，reset 已過不宣稱完成；窄寬不截斷主要資訊 | 待驗 |
+| 7 | 實際 approaching／completed 通知名稱與 Dashboard 一致；Reserve 不通知 | 待驗 |
+| 8 | 左鍵開啟／關閉 Dashboard；外部點擊 dismissal 正常 | 待驗 |
+| 9 | 右鍵只開一份原生選單，不開 Dashboard；重複開關不累積 item | 待驗 |
+| 10 | 立即重新整理正常；進行中再次要求不產生重疊刷新 | 待驗 |
+| 11 | 未曾開 Dashboard 就直接右鍵「設定…」也能開既有 Settings；反覆開啟重用視窗 | 待驗 |
+| 12 | 退出 QuotaMew 正常結束，owned Codex child 清理，偏好/onboarding 不變 | 待驗 |
+| 13 | icon、—／0%／61%／100% 與 intrinsic width 不退化；notch／多螢幕可用 | 待驗 |
+| 14 | 沒有意外出現舊 QuotaPulse 公開 App 名稱 | 待驗 |
+| 15 | About（若提供）、recovery、Settings、Dashboard 與系統 App 名稱符合 QuotaMew／QuotaMew Debug | 待驗 |
+| 16 | Light mode；secondary Reserve 與 progress 對比清楚 | 待驗 |
+| 17 | Dark mode；包含 reduced transparency | 待驗 |
+| 18 | English 文案與右鍵選單 | 待驗 |
+| 19 | 繁體中文（臺灣）文案與右鍵選單 | 待驗 |
+| 20 | VoiceOver 讀出 provider／共用名稱／百分比；倒數仍可存取；方向鍵／Return／Escape 操作選單與 Command-Q 正常 | 待驗 |
+
+Reserve 耗盡條件可先用 synthetic preview/fixture 檢查，不為驗收耗用真實額度或改寫 provider 資料。普通 XCTest 不送實際通知；系統通知送達須另行明確操作。這輪未完成新 UI 的視覺／VoiceOver、真實通知、installed Login Item 或效能驗證，不沿用舊 Milestone B 的人工通過紀錄冒充本次證據。
+
+自動化證據、名稱殘留分類與版本下一步見 [PRODUCT_POLISH_AUDIT.md](PRODUCT_POLISH_AUDIT.md)。
+
 效能門檻以 [`docs/PERFORMANCE.md`](PERFORMANCE.md) 為唯一來源。本文件負責測試步驟與紀錄格式。
 
 ## 1. 前置條件

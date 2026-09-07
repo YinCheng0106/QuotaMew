@@ -1,157 +1,100 @@
 # QuotaMew v0.2 產品範圍
 
-> 決策日期：2026-08-31
-> 性質：規劃與狀態文件。此文件不代表任何 v0.2 功能已簽署、已公證或已發行。
+> 更新：2026-09-07。本決策取代 2026-08-31 將外部 feed reader/matching 納入 v0.2 的規劃。
+> 公開版本：**v0.2.0-beta.2 — QuotaMew v0.2.0 Beta 2**。Beta 3 尚未發行。
 
-## 決策摘要
+## 產品目標與里程碑
 
-v0.2 的最小高價值目標是讓 QuotaMew 成為 **reset-aware AI coding quota assistant**：在不蒐集開發工作內容、不增加高頻輪詢的前提下，讓重度 Codex 使用者一眼看到自己選擇的額度呈現，並在有可追溯官方事件時，知道它與自己的本機快照有何關聯。
+v0.2 聚焦隱私優先的本機額度呈現、可靠的原生選單列操作與容易理解的首次啟動體驗。產品與 repository 更名已完成；相容性敏感的 bundle、偏好設定、通知與 autosave identity 不再搬遷。
 
-次要差異點只有兩項：
-
-1. **隱私優先的本機額度視圖**：provider authentication、usage snapshot 與配對判斷留在 Mac 上。
-2. **可追溯的 reset 資訊**：每一筆官方事件都連回原始來源；AI 摘要永遠不是權威來源。
-
-這不是 generic AI dashboard、使用分析或 provider 數量競賽。v0.2 不以 binary distribution、Sparkle、歷史圖表或未驗證的 Claude 支援為交付目標。
-
-## Milestone 狀態
-
-| Milestone | 狀態 |
+| Milestone | 目前狀態 |
 | --- | --- |
-| A — contract freeze | **COMPLETE / frozen**；trusted feed、presentation preference、pinned-provider 與 onboarding persistence contracts 已由 fixtures 與 deterministic tests 鎖定。 |
-| B — Display + Settings | **COMPLETE**；production 使用單一 `NSStatusItem` controller，parallel XCTest zero-status-item-host gate、Debug／Release build identity、recovery／reopen、compact width 與 clean-user Release manual acceptance 均已完成。 |
-| C — Onboarding | **NOT STARTED**；目前 scope 暫停，不能由本 checkpoint 偷渡開始。 |
+| A — contract freeze | **COMPLETE / frozen**。既有 feed schema、presentation、pin 與 onboarding persistence contracts 保留。 |
+| B — Display + Settings | **COMPLETE**。Hybrid NSStatusItem、Remaining／Used、pin、Settings、recovery 與 zero-XCTest-host gates 已完成。 |
+| C — Onboarding | **NOT STARTED（UI）／REQUIRED for v0.2**。已有 OnboardingState、versioned persistence 與測試；尚無首次啟動頁、略過／完成流程或 Settings 重看入口。 |
+| Product Polish | 額度命名、Luna Reserve 呈現、右鍵選單與公開文件修正已實作於工作樹；驗證見 [Product Polish 稽核](PRODUCT_POLISH_AUDIT.md)，人工驗收仍待完成。 |
+| Release acceptance | C 與 Product Polish 驗收 → **beta.3** → release hardening → **rc.1** → **v0.2.0**。 |
 
-## 已交付的 v0.1.1 基準
+Product Polish source 完成不代表 Milestone C 完成，也不代表 Beta 3 可立即打包。C 仍在 v0.2；本次 A–F 任務不另行實作 Onboarding。
 
-| 項目 | 判定 | v0.2 的處理方式 |
-| --- | --- | --- |
-| Codex provider | 已完成；ChatGPT.app bundled runtime 曾完成 live validation | 保留 app-server-first 與安全失敗；持續收集相容性證據，不重做 provider。 |
-| Claude experimental foundation | 部分完成 | bounded snapshot reader 與共用 UI 已存在；bridge、setup/restore、實際訂閱帳號驗證仍缺。 |
-| Provider enable/disable | 已完成 | disabled provider 不 fetch、不通知、不出現在 Dashboard；重啟用與 in-flight refresh race 已有保護。 |
-| Refresh lifecycle | 已完成 | `AppModel` 保有單一 provider refresh lifecycle；不得為 v0.2 另建 provider polling loop。 |
-| Reset reminders 與 completed-reset notification | 已完成 | 已有本機 detector、重啟去重與通知交付路徑；只維護 regression 與 opt-in 系統送達證據。 |
-| Local reset detection | 已完成 | 僅接受新鮮 `.available` 非 mock snapshot、強 cycle evidence；百分比下降本身不算 reset。 |
-| MenuBar recovery | **Milestone B COMPLETE** | OFF 改為隱藏 status item 並保持目前 process；explicit reopen 提供 recovery，hidden login-item launch 安靜退出。保留 persisted intent、logical visibility 與 system visibility 三者區分；不以重插入 loop、private Control Center state 或 bundle ID workaround 處理。 |
-| Debug/Release identity isolation | 已完成 | 不更改 bundle identifier；每次 artifact 驗證另行確認實際 build identity。 |
-| Production App Icon 與英／繁中本地化 | 已完成 | 只隨新增 UI 補齊字串與可近用性，不重開 branding 專案。 |
-| Privacy-safe Diagnostics | 已完成 | 已有 allowlisted Copy Diagnostics；每個新 network/provider state 必須擴充 allowlist 與 regression test。 |
-| `ResetEvent` / `ResetEventSource` boundary | 已完成，但外部 feed 未實作 | 作為 v0.2 feed 的起點；需補 verification、retrieval、revision、correction/retraction schema。 |
+## v0.2 交付範圍
 
-已知系統層級驗證（Notification Center 實際送達、Control Center 可見性、Launch at Login）仍應與自動化測試分列，不把先前的單機結果當成所有使用者的保證。
+- 一個 production NSStatusItem／StatusItemController，原生 popover 承載既有 SwiftUI Dashboard。
+- Remaining／Used、固定 provider、General／Providers／Notifications Settings。
+- 既有 lifecycle、hide/show、reopen/recovery、Launch at Login 行為與穩定身分。
+- 已完成的 QuotaMew 公開品牌更名，以及必要的相容性名稱保留。
+- 可略過、可重看的 Milestone C Onboarding。
+- 共用的 5 小時／每週額度命名與通知／VoiceOver 一致性。
+- Luna Reserve 次要資訊與保守的展開規則。
+- 原生右鍵選單：立即重新整理、設定…、退出 QuotaMew。
+- Beta 回饋修正與 release hardening。
 
-## 候選項目判斷
+不納入：Reset Intelligence network/feed reader、cache/service、local matching、collector/backend、自動更新、歷史圖表、burn-rate、Gemini/OpenCode 或 Claude bridge 安裝器。Claude 保持 **Experimental / Unverified**。
 
-| 候選／分類 | 價值、對象與差異 | 複雜度／維護 | 隱私、資源與可靠性／依賴 |
-| --- | --- | --- | --- |
-| 1. Completed-reset notification — **已完成** | 對受 rolling window 限制者價值高；已是可信差異點。 | 不應重做；只維護 regression。 | 無新增網路/資源；維持 at-most-once、restart-safe 去重與 false-positive 保護。 |
-| 2. Official Reset Intelligence — **MUST** | 重度 Codex 使用者的高差異化資訊，非 generic dashboard。 | L／中等 editorial 維護；只做人工審核 static feed ingestion。 | 可選低頻 GitHub fetch；依賴可追溯來源、schema 與 review，不做 collector/backend。 |
-| 3. 官方事件 + 本機 quota 結合 — **SHOULD** | 讓事件可行動，尤其仍有大量剩餘額度者。 | M／低至中等；併入 feed 工作流。 | 僅 fresh snapshot + verified/audience-matched event；不能承諾 bonus eligibility，無 usage upload。 |
-| 4. Menu bar provider selection — **SHOULD** | 每日 glanceability；對單一主力 provider 使用者最有感。 | M／低維護；只做一個 pinned provider。 | 純本機、無 CPU/network；不可自動切換、輪播或多 provider title，以免狀態不可靠。 |
-| 5. Remaining vs Used — **SHOULD** | 同上，減少認知轉換；不以功能數量取勝。 | S／低維護；presentation-only formatter。 | 無資料新增；不得改變 domain calculation、進度、detector 或 notifications。 |
-| 6. Menu bar secondary action — **DEFER** | 便利性有限，現有 window footer 已涵蓋核心動作。 | L／高回歸維護；需 AppKit shell spike。 | `MenuBarExtra(.window)` 無獨立 secondary-click API；依賴 `NSStatusItem` 行為、鍵盤與多螢幕驗證。 |
-| 7. Settings information architecture — **SHOULD** | 防止 v0.2 設定變成難讀表單。 | M／低維護；General／Providers／Notifications。 | 純 UI；依賴 Display/feed preference，不建空泛 Advanced tab。 |
-| 8. Onboarding — **MUST** | 降低 source-build 新手與隱私敏感者的設定疑慮。 | M／低維護；單頁、可略過/重看。 | 無 telemetry/network；依賴既有 diagnostics model，系統通知只能明確動作後請求。 |
-| 9. Diagnostics — **已完成** | 高維護價值，但不是新 scope。 | 只隨新 state 補 allowlist/test。 | 無 raw payload/path；維持 copy output 的 privacy safety。 |
-| 10. Update checking — **DEFER** | 對 source-only 使用者價值低。 | S/M，但會增加後續 network/support 面。 | 依賴第一個 signed/notarized binary；否則不查 GitHub Releases API。 |
-| 11. Automatic update — **DEFER** | 未達 binary 散布前沒有用戶價值。 | L／持續安全維護；未來用 Sparkle 2。 | 依賴 Developer ID、notarization、artifact、appcast、EdDSA 與多次穩定 release；拒絕 custom updater。 |
-| 12. Claude Code full support — **DEFER（驗證 gate）** | 多 agent 使用者有價值，但承諾過早會損害可信度。 | L／高維護；bridge/setup/restore。 | 依賴合格訂閱帳號、support-version fixtures 與 clean/existing config 驗證；維持 Experimental / Unverified。 |
-| 13. Gemini CLI — **DEFER** | provider breadth 的邊際價值低於可靠合約。 | L／高相容性維護。 | `/stats model` 是互動表面，非安全 pull contract；不 screen-scrape/啟動 session。 |
-| 13. OpenCode — **REJECT（本版）** | 有方案 quota，但與產品主力使用者及 contract 不匹配。 | L／高維護。 | 未見文件化 current-usage read contract；本機 server 也有 project/path/config 面，不能作 provider 基礎。 |
-| 14. Usage pacing / burn rate — **DEFER** | 潛在價值高，但差異化不足以抵銷誤報。 | L／高維護；先離線 fixtures。 | 依賴同 cycle 足量 fresh samples；跨裝置/sleep/reset 下只能輸出 insufficient data，否則不做。 |
-| 15. Local history — **DEFER** | chart 尚未證明會改善日常決策。 | L／storage migration/retention/UI 維護。 | 會增加本機敏感 usage footprint 與 disk/CPU；不先導入 SwiftData/SQLite。 |
-| 16. Distribution — **DEFER（獨立軌）** | 採用價值很高，但非 v0.2 feature blocker。 | XL／release 維護。 | 依賴 Apple Developer Program、sign/notarize 與 installed-app proof；不以 unsigned workaround 取代。 |
+## Milestone C — 必要的下一項產品實作
 
-### Reset Intelligence 架構決策
+單頁原生首次啟動流程，重用既有 preferences 與 allowlisted diagnostics：
 
-採用 **A + B 的最小組合**：維護者人工審核的、版本化 static JSON，託管於公開 GitHub repository；App 只讀該 feed。GitHub Actions 僅驗證 schema、URL、時間、stable ID/revision 與 correction/retraction 關係，不能蒐集來源或自動發布事件。
+1. 歡迎與隱私摘要：讀取本機額度，不讀 prompt、transcript、credential 或 coding history。
+2. Codex runtime detected/not detected 與 Claude snapshot configured/not configured 狀態；不新增 provider I/O、bridge installer 或私密路徑輸出。
+3. 使用者可選 Launch at Login、Remaining／Used、pinned provider；初次呈現不覆寫既有選擇。
+4. 通知權限只能由使用者明確動作觸發；整合時須審核現有 refresh-driven authorization，避免首次啟動自動跳出提示。
+5. Skip 與 Complete 都可進 Dashboard；Settings 可重看，重看不重置任何 provider、notification 或 onboarding 選擇。
 
-不採用：
+持久化沿用 `onboarding.state`（neverShown／completed／skipped）、`onboarding.last-completed-version` 與 current version 1，不新增平行 state owner。
 
-- GitHub Actions collector、Cloudflare Worker、輕量 backend：都會引入來源爬取、uptime、濫用、成本與 editorial 責任。
-- App 直接輪詢 X、公告頁或 help page：來源格式不穩定，會把網路、隱私與維護風險放進每台 Mac。
-- hybrid rules + AI classifier 自動發布：AI 只能協助維護者整理候選，永遠不能成為 event publisher 或 authority。
+驗收須涵蓋 fresh user、Codex absent、Claude unconfigured、all disabled、permission denied、完成／略過／重看、重啟保留，以及英／繁中、鍵盤、VoiceOver、light/dark。若說明需要 quota-window 名稱，使用 UsageWindowPresentation。
 
-feed 的每筆事件至少有：schema version、stable ID、revision、provider、event kind、publisher、原始 source URL、publication time、retrieval time、effective time/range、audience、verification status、display-safe summary，以及 correction/retraction relationship。這補齊目前 `ResetEvent` abstraction 尚未模型化的治理資料。
+## Product Polish 決策
 
-App 端必須有大小上限、ETag、expiry、last-known-good cache、離線安全失敗、event/revision 去重與手動 refresh。自動抓取只在啟動及低頻（最長 12 小時一次）執行，且由獨立、coalesced 的 `ResetEventService` 擁有；絕不綁到 15 分鐘 provider refresh，也不傳送 usage、reset、workspace、裝置 ID 或 prompt。使用者應能在 Settings 關閉這個可選網路功能。
+### 共用額度名稱
 
-## v0.2 範圍：三個工作流
+UsageWindowPresentation 是純呈現值，接受 normalized UsageWindow，或 completed-reset 現有的 provider/window ID/duration。
 
-### A. 每日額度呈現與可擴充 Settings — M
+- duration **精確等於 18,000 秒** → **5-hour／5 小時**。
+- duration **精確等於 604,800 秒** → **Weekly／每週**。
+- 已知 Reserve ID 優先 → **Luna Reserve**，兩種語言不翻譯。
+- 其他／缺少／無效 duration → 通用 quota window／配額週期；不顯示 provider raw label。
 
-**問題**：選單列目前只顯示固定 icon；Dashboard 雖同時顯示 used/remaining，使用者無法選擇自己每日最需要的主資訊。單一 Settings Form 也即將因 Display 與 feed option 變得難讀。
+不以 array position、primary/secondary role 或距 reset 剩餘時間命名，不改 domain ID/label、百分比、reset/cycle metadata。Dashboard、VoiceOver 與 approaching/completed notifications 共用名稱；倒數獨立顯示。
 
-**使用者收益**：重度 Codex／多 agent 開發者能在不開啟 dashboard 的情況下，穩定看到自己指定 provider 的一個一致數字；不需要猜測 App 為何切換。
+### Luna Reserve
 
-**實作輪廓**：新增 presentation-only preference（`used` 或 `remaining`）與固定 pinned provider；選單列為 icon-only 或 provider short label + 一個整數 percentage。Dashboard 對 primary metric 與 VoiceOver value 套用同一 preference，進度色與 notification/detector 計算不變。Settings 只拆 General／Providers／Notifications；Display 放 General，Diagnostics 仍為 General 入口。
+2026-09-07 只讀 runtime metadata 顯示 dictionary key/limitId 為 `base_model_inference`、limitName 為 `gpt-reserve`，有一個 10,080 分鐘 primary window；一般 codex bucket 為 300／10,080 分鐘。現有 mapper 依 dictionary key 產生 `codex.base_model_inference.primary`，排序會讓它在一般 windows 前面。沒有可靠的 Reserve-active 布林訊號可供目前 model 使用。
 
-**依賴／架構**：新增 display preference store 與 presentation formatter，不修改 `UsageWindow` 的 quota calculation、`UsageService`、`RefreshCoordinator` 或 `NotificationService`。
+呈現層精確 allowlist：`codex.base_model_inference.primary/secondary` 與 `codex.gpt-reserve.primary/secondary`，且 provider 必須是 Codex。前者為觀察到的形式，後者僅為相容別名。未知類似名稱不作 substring 推論。此 metadata 關聯不是穩定的官方 billing contract，未來變更時安全退回通用名稱。
 
-**維護／隱私**：低；純本機 preference，無新資料與網路。
+一般 windows 永遠先顯示。Reserve 平常是沒有 progress bar／倒數的精簡次要列，只顯示名稱與既有 Remaining／Used 百分比或 unavailable。
 
-**驗收條件**：pinned provider 不可用時維持該選擇並顯示 unavailable，絕不暗中換 provider；所有 enabled provider 順序仍穩定；used/remaining 文字、VoiceOver、英／繁中與窄寬／notch 環境通過檢查；自動化測試證明 presentation 不改變 domain percentage、detector 或通知 threshold。
+只有 available、capture age 在 **0..<15 分鐘**，且一般 `codex.codex.primary/secondary` 的 5 小時或每週 window 有 **原始 usedPercentage == 100**、reset 仍在未來時，Reserve 才展開成完整列。任一一般 window 都可符合，不只 weekly。缺少資料、stale/failure/loading、未知 bucket/duration、99.9 的四捨五入或超界百分比都不能觸發。
 
-**Milestone B final acceptance（2026-09-02）**：已以 `UsagePresentation` 接入 Dashboard 主 percentage、VoiceOver 與單一選單列 metric；`MenuBarPresentation` 明確分離 persisted pin 與 currently rendered provider，unknown／disabled／unavailable pin 不會 fallback。Production shell 已由 `MenuBarExtra` 遷移為一個 AppKit `NSStatusItem` controller，以 transient popover 承載原有 SwiftUI dashboard，並重用同一份 `AppModel`／`SettingsModel`。Controller 直接處理 create-once、stable autosave identity、hide/show、KVO logical visibility、recovery force-show、compact label 與 accessibility metadata；Settings OFF 不終止 process，hidden login-item launch 則在建立 item 前安靜退出。App-hosted XCTest 完全略過 controller 建立，scheme 使用 parallel execution；controller fake tests 與 read-only Control Center log 證明自動測試 host 不建立 status item。clean-user Release manual acceptance 證明 QuotaMew 與 ChatGPT 獨立顯示且互不隱藏。這些改動沒有新增 network、timer、scheduler、provider I/O 或 Milestone C scope。主要開發帳號的 cascade 僅記錄為歷史 user-scoped Control Center stale state，不是 Release 架構缺陷，也不以程式修復。
+這只讓 fallback 資訊更容易找到，不聲稱 Reserve active、計費語意、資格或一定能繼續使用。Reserve-only snapshot 保留次要列，選單列顯示 unavailable，不用 Reserve 偷換一般額度。純 projection 不刷新、不持久化、不建立 history。
 
-### B. 可略過的首次啟動與可重看說明 — M
+v0.2 **不送 Reserve approaching/completed reset notifications**：policy 排除提醒；service 在授權前排除 completed-reset delivery。一般 threshold、dedup identity、eligibility、provider generation 與 LocalResetDetector 演算法不變。Detector 原有 bounded current-cycle baseline 繼續更新，不增加 Reserve history store，也不清除既有使用者 state。
 
-**問題**：source-build 使用者需要自行理解 Codex runtime、Claude 未驗證狀態、資料邊界與通知 permission，容易把 unavailable 誤解為錯誤。
+### 右鍵選單
 
-**使用者收益**：隱私敏感或第一次使用者在 1–2 分鐘內知道「偵測到什麼、讀什麼、不讀什麼、接下來能做什麼」。
+既有標準 NSStatusBarButton 的公開 sendAction(on:) 接收左右 mouse-up；左鍵切換 Dashboard，右鍵由同一 controller 關閉 popover 並顯示同一份 NSMenu。不安裝 custom status view、global mouse monitor、timer 或第二個 item。
 
-**實作輪廓**：單頁原生 sheet/window：歡迎、Codex runtime detected/not detected、Claude bridge configured/not configured、隱私摘要、Launch at Login、Display 及 pinned provider 預設。通知 permission 僅由使用者明確按鈕觸發；Skip 立即進 Dashboard；Settings 可重看，不重置任何 provider設定。
+Refresh 使用 AppModel.refreshManually()，保留 RefreshCoordinator 合併。Settings 經 App 的公開 SwiftUI openSettings action 開啟原有 Settings scene；Quit 呼叫正常 NSApplication.terminate，沿用既有 refresh/process/observer/controller cleanup，不改任何 preference。只有 Quit 配置 Command-Q；其餘使用原生 menu keyboard navigation。
 
-**依賴／架構**：重用 compatibility diagnostics 的 allowlisted detection snapshot；不得把 onboarding 變成 provider I/O 或 bridge installer。
+## v0.3 — Reset Intelligence
 
-**維護／隱私**：低；只保存 completed/dismissed preference，且不新增 telemetry。
+原 Milestone D/E 移至 **v0.3**：人工審核 static feed governance/reader、bounded cache、ETag/expiry、獨立 fetch owner，以及 verified-event + fresh-local-snapshot matching。Milestone A 的 frozen contracts 與 fixtures 保留，不因延後而刪除。
 
-**驗收條件**：fresh、Codex absent、Claude unconfigured、all providers disabled 與 permission denied 都可完成或略過；不存在「必須開啟通知」或「必須啟用 Claude」的阻塞；重看不覆寫既有選擇；可近用性、鍵盤、英／繁中、light/dark mode 均有驗證。
+- 每筆事件保留原始 URL、publisher、publication/retrieval/effective time、verification、revision、correction/retraction。
+- App 不爬來源頁面、不自動發布；AI 不能作 publisher 或權威來源。
+- reader/service 不依賴 provider refresh，不上傳 usage、workspace、prompt、裝置或帳號資訊。
+- future-schema、oversized、invalid/retracted/offline/stale 都要安全失敗，本機額度保持可用。
 
-### C. Trusted Reset Intelligence Phase 1 — L
+詳細既有合約見 [RESET_INTELLIGENCE_FEED.md](RESET_INTELLIGENCE_FEED.md)。本次不實作 network、reader、service、cache 或 matching。
 
-**問題**：本機 detector 能確認自己看到的新 cycle，卻無法讓使用者知道官方已宣布的全域 reset、temporary increase、banked reset 或 correction。
+## 版本與發行工作流程
 
-**使用者收益**：額度常受 rolling quota 限制的使用者能收到有來源連結的、保守的官方事件；這是比 history/chart 更直接可採取行動的資訊。
+目前 Xcode app target 的 Debug／Release 都由 MARKETING_VERSION = 0.2.0 與 CURRENT_PROJECT_VERSION = 2 產生 Info.plist；test target 自有版本不是 App 對外版本。Beta 字尾只存在 Git tag／發行產物命名，packaging script 不修改 Info.plist。
 
-**實作輪廓**：演進 `ResetEvent` schema、cache 與 `ResetEventSource`；導入唯一的 static GitHub feed reader 與 event timeline/notification presentation。配對只使用新鮮 normalized local state：例如 verified「within next hour」事件可附「最新本機快照仍有 68% remaining」；eligible-account bonus 一律連回 eligibility/source，不說「你已取得」。correction/retraction 取代舊 revision，通知以 event ID + revision 去重。
+Git 歷史 fbbc449 與 a077596 顯示版本／build number 在 release preparation 更新。本次保留 App **0.2.0 (2)**，以 CHANGELOG Unreleased 記錄。
 
-**依賴／架構**：新增獨立 `ResetEventService`、bounded cache/state、Settings opt-in 與 feed repository/validation workflow。它不能依賴、阻塞或觸發 `UsageProvider`、Codex app-server 或 Claude snapshot reader。
+**下一項任務：實作 Milestone C Onboarding，完成 C 與 Product Polish 人工驗收。** 通過後另開 Beta 3 release preparation：把兩個 App configuration 的 build number 更新為 3，保留 marketing version 0.2.0，驗證 Release artifact，再依明確授權準備 `release/v0.2.0-beta.3/QuotaMew.app`。既有打包指令為 `./script/create-dmg.sh 0.2.0-beta.3`；它必須在後續發行任務才執行，不是本次命令。
 
-**維護／隱私**：中等；需要 maintainer editorial review 與來源校對。網路請求僅取得公開 feed（仍會暴露一般網路連線 metadata，如 IP），沒有 QuotaMew account、analytics 或 local usage upload。
-
-**驗收條件**：每個顯示/通知事件可開啟原始 URL；feed unavailable/invalid/stale 時本機 quota 照常；correction/retraction 能安全取代且不重複提醒；事件、cache、response body 與 persistence 都有嚴格大小/版本限制；fixture 覆蓋 malformed/future schema、expiry、revision、dedup、audience mismatch、local snapshot stale 與 notification permission denied；透過手動 review 發布的少量 seed event 做端對端驗證。
-
-## 精確實作順序
-
-1. **Milestone A — v0.2 contract freeze**：先定義 feed schema/governance、display preference 的純 presentation boundary、Settings IA 與 onboarding state model；以 fixtures/tests 鎖定既有 detector/notification 不變。這先消除之後 schema 與設定 migration 的返工。
-2. **Milestone B — Display + Settings**：實作 used/remaining、pinned provider、General/Providers/Notifications，完成 menu width/VoiceOver regression。這些純本機變更會提供 onboarding 的可設定目標。
-3. **Milestone C — Onboarding（NEXT / NOT STARTED）**：Milestone B 已完成；只有使用者明確恢復 scope 後，才可重用 Milestone B 的 preferences 與既有 diagnostics snapshot。本次不實作 Milestone C。
-4. **Milestone D — Feed governance and reader**：先建立人工審核 static feed、schema validation、fixture、cache/ETag/expiry 與單一 coalesced fetch owner，再接 UI。先讓資料鏈可靠，才開始使用者可見的解釋。
-5. **Milestone E — Conservative event/local matching and release evidence**：最後做 verified-event + fresh-local-snapshot 的可選文字與通知，並完成 no-upload、correction/retraction、notification dedup、offline 和低資源 soak 驗證。這避免 feed 還未可追溯時就誤導使用者。
-
-## 明確不納入 v0.2 的三件事
-
-1. **自動更新與 Sparkle**：沒有 signed/notarized binary 的前置條件時不做。
-2. **Claude Code bridge 宣稱為正式支援**：缺少合格訂閱帳號與可逆 setup 的系統驗證；只做文件/fixture 維護。
-3. **Usage history、charts 與 burn-rate ETA**：先證明同 cycle fresh samples 能產生可信粗粒度訊號，否則不保存資料或做圖表。
-
-Gemini/OpenCode provider 擴張、右鍵 AppKit shell、GitHub Actions collector/backend、rotation/multiple provider menu title 也同樣不在本版。
-
-## 散布建議
-
-散布維持獨立 track：source-only → 可重現 Release build → Developer ID/Hardened Runtime/notarization/staple → signed/notarized ZIP 或 DMG → 只提示的 GitHub latest-release checker → custom Homebrew tap → 2–3 個穩定 binary releases 後才評估 Sparkle 2 與 official Homebrew Cask。
-
-Apple Developer Program 的合理 trigger 不是單次 release，而是已出現重複「不想裝 Xcode」的外部回饋、約十位以上獨立使用者的安裝問題/需求、維護者願意承諾多個 binary releases，或 source-only 已明確成為持續使用的主要阻礙。屆時散布可以另開 v0.2.x 或專案 track；它不是本 v0.2 產品功能的 blocker。
-
-## Claude 與其他 provider 建議
-
-Claude 仍應維持 **Experimental / Unverified**。要進入正式 roadmap gate，至少需要：Claude Code 支援版本的真實 status-line fixtures、一個合格 Pro/Max（及必要時 Team/Enterprise）測試帳號、fresh profile/現有 `statusLine.command`/managed settings 的 preview-backup-restore 測試、atomic snapshot/permission/symlink hardening，以及實際 notification/freshness 行為證據。未滿足前不做 bridge 安裝器，也不改標籤。
-
-Gemini CLI 目前只有互動式 `/stats model` 表面，OpenCode Go 有公開的方案 limits 但不是 QuotaMew 可採用的安全 current-usage read contract。兩者都不值得以 credential、screen scraping、session 啟動、project server 或 token 推估來填補缺口。
-
-## 版本建議與第一個實作任務
-
-下一版應為 **v0.2.0**：它會新增可設定的日常 presentation、首次啟動流程與可選的外部 trusted feed，屬於明顯的新使用者能力，不是 v0.1.2 的修補。
-
-第一個實作任務應是：**撰寫並核准 versioned `ResetEvent` feed schema/governance fixtures，同時列出 `SettingsStore` presentation/onboarding migration keys，但不接任何 network 或 UI。** 這先固定 v0.2 最高風險的資料合約與 privacy boundaries，讓後續 Display、onboarding 與 feed reader 不需要再搬遷資料模型。
+不得把編譯／XCTest 視為 VoiceOver、真實通知送達、Launch at Login、Developer ID signing、notarization 或 DMG 發行證據。

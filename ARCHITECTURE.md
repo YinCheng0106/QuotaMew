@@ -68,6 +68,18 @@ ResetEvent，保留不可變的原始來源 URL 與 source name
 
 UI 只接收正規化後的 snapshot；不解析 provider payload、不啟動指令，也不讀取檔案。
 
+### v0.2 Product Polish（2026-09-07，尚未發行）
+
+額度名稱只有一個來源：`UsageWindowPresentation`。精確 duration 18,000 秒對應 `5-hour`／`5 小時`，604,800 秒對應 `Weekly`／`每週`，未知／缺少／無效 duration 使用通用名稱；不由 array position、primary/secondary 或倒數推論，也不把 raw provider label 顯示給使用者。Dashboard row、VoiceOver header 及 approaching/completed notification 文案都共用此 formatter；`UsagePresentation` 繼續只負責 Remaining／Used 百分比。Domain ID、label、duration、reset/cycle metadata 保持原值；`LocalResetDetector` 不參與本地化。
+
+`ProviderWindowsPresentation` 是目前 snapshot 的純值 projection。Codex 精確 ID `codex.base_model_inference.primary/secondary`（runtime 觀察）與 `codex.gpt-reserve.primary/secondary`（相容別名）顯示為 **Luna Reserve**。一般 windows 先顯示；Reserve 平常只提供沒有 progress bar／倒數的次要精簡列。僅當 available、capture age 在 0..<15 分鐘、一般 codex bucket 的 5 小時或每週 window 原始 usedPercentage 恰為 100 且 reset 尚未到期，才展開 Reserve。這不宣稱 Reserve 已啟用、計費狀態或使用資格；缺少／stale／invalid 資料不觸發。選單列排除 Reserve，絕不以其百分比取代一般 window。沒有新增 persistence/history、refresh 或 timer。
+
+Reserve 的 approaching reminders 在 policy 中排除；completed resets 在 service 授權與送達前排除。這是 v0.2 保守的通知範圍縮限。一般 thresholds、dedup identity、eligibility、provider lifecycle generation、authorization/revalidation 與 `LocalResetDetector` 演算法不變；detector 原有 bounded current-cycle state 繼續更新，不新增 Reserve history。
+
+同一 `StatusItemController` 另持有一個 `StatusItemContextMenu`／`NSMenu`。既有標準 button 透過公開 [`sendAction(on:)`](https://developer.apple.com/documentation/appkit/nscontrol/sendaction(on:)) 接收左右 mouse-up，以 current event type 分派；右鍵關閉 popover 後透過 [`NSMenu.popUp(positioning:at:in:)`](https://developer.apple.com/documentation/appkit/nsmenu/popup(positioning:at:in:)) 顯示同一份選單。左鍵保持原 Dashboard toggle。Refresh 沿用 `AppModel.refreshManually()`；Settings 經 App 提供的公開 SwiftUI `openSettings` action 開啟原 Settings scene；Quit 正常 `NSApplication.terminate`。Teardown 清除 menu target/action 並取消 tracking，再走既有 observer/popover/item teardown。沒有 custom status view、global monitor、第二個 status item 或 private API；autosave/bundle/recovery/login-item 語意不變。
+
+Milestone C 只有 persistence contract，Onboarding UI 仍為 v0.2 必要的下一項實作。原外部 Reset Intelligence D/E reader/network/matching 移至 v0.3；frozen contracts 保留。完整政策與版本流程見 [V0_2_PLAN.md](docs/V0_2_PLAN.md)。
+
 ## 4. Domain model
 
 Milestone 1 已實作以下責任：
@@ -247,7 +259,7 @@ App termination 會取消 App-owned schedule／refresh，並要求 coordinator c
 
 v0.1 依 normalized `UsageWindow.duration` 選擇門檻，不做 provider-specific 分支，也不做每 10% 等頻繁 percentage alerts。6 小時以下的短視窗使用 reset 前 1 小時與 30 分鐘；超過 6 小時的長視窗使用 24、6、1 小時候選門檻，並排除長於該視窗本身的門檻。缺少或無效 duration 時不猜測分類，也不建立通知。每個 window／threshold 最多一則：
 
-- remaining percentage 至少 20% 時，送「significant remaining quota」版本，例如 title `Codex resets in 6 hours`，body `You still have 61% of your quota remaining.`
+- remaining percentage 至少 20% 時，送「significant remaining quota」版本；Product Polish title 使用共用名稱，例如 `Codex Weekly quota resets in 6 hours`，body `You still have 61% of your quota remaining.`
 - percentage 缺少、無效或 remaining 低於 20% 時，送不含數字的「reset approaching」版本
 
 20% 是 v0.1 的保守 noise floor，不是方案額度推估，也沒有在本次加入 Settings UI。若 App 第一次看到 window 時已同時跨過多個適用門檻，只送最接近 reset 的一則，並把較早門檻一併標記完成，避免多則提醒同時湧入。

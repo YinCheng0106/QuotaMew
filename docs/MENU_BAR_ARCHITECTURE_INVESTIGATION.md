@@ -1,7 +1,7 @@
 # Menu Bar Architecture Investigation
 
 Date: 2026-09-01 — final acceptance update 2026-09-02
-Scope: MenuBar architecture only; Milestone C and unrelated v0.2 work remain stopped.
+Historical scope: MenuBar architecture only; Milestone C and unrelated v0.2 work were stopped during this investigation. Current v0.2 scope and the subsequent right-click menu are documented in [V0_2_PLAN.md](V0_2_PLAN.md) and [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 This investigation was completed before the public product rename. `QuotaPulse` references in measured evidence below intentionally retain the name used by the tested build; current product documentation uses QuotaMew.
 
