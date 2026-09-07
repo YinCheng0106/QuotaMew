@@ -59,11 +59,13 @@ struct MenuBarRecoveryView: View {
 final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     typealias ControllerFactory = @MainActor (
         AppModel,
-        SettingsModel
+        SettingsModel,
+        SettingsSceneRoute
     ) -> any StatusItemControllerLifecycle
 
     private let controllerFactory: ControllerFactory
     private let terminateApplication: @MainActor () -> Void
+    let settingsSceneRoute = SettingsSceneRoute()
     private var appModel: AppModel?
     private var settingsModel: SettingsModel?
     private(set) var statusItemController: (any StatusItemControllerLifecycle)?
@@ -72,10 +74,14 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
 
     override convenience init() {
         self.init(
-            controllerFactory: { appModel, settingsModel in
+            controllerFactory: { appModel, settingsModel, settingsSceneRoute in
                 StatusItemController(
                     appModel: appModel,
-                    settingsModel: settingsModel
+                    settingsModel: settingsModel,
+                    openSettings: {
+                        NSApplication.shared.activate()
+                        settingsSceneRoute.open?()
+                    }
                 )
             },
             terminateApplication: {
@@ -166,7 +172,7 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
         settingsModel: SettingsModel
     ) {
         guard statusItemController == nil else { return }
-        statusItemController = controllerFactory(appModel, settingsModel)
+        statusItemController = controllerFactory(appModel, settingsModel, settingsSceneRoute)
     }
 
     private func showRecoveryWindow(settingsModel: SettingsModel) {

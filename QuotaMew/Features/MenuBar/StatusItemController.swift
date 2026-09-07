@@ -52,7 +52,9 @@ protocol StatusItemHandling: AnyObject {
     var isVisible: Bool { get set }
     var anchorView: NSView? { get }
     var onActivate: (@MainActor () -> Void)? { get set }
+    var onSecondaryActivate: (@MainActor () -> Void)? { get set }
 
+    func showContextMenu(_ menu: NSMenu)
     func setAutosaveName(_ name: String)
     func setButtonPresentation(_ presentation: StatusItemButtonPresentation)
     func observeVisibility(
@@ -87,6 +89,7 @@ final class StatusItemController: StatusItemControllerLifecycle {
     private let settingsModel: SettingsModel
     private let statusItem: any StatusItemHandling
     private let popoverPresenter: any StatusItemPopoverPresenting
+    private let contextMenu: StatusItemContextMenu
     private var visibilityObservation: (any StatusItemVisibilityObservation)?
     private var observationReregistrationTask: Task<Void, Never>?
     private var lastAppliedRequestedIntent: Bool?
@@ -106,6 +109,10 @@ final class StatusItemController: StatusItemControllerLifecycle {
                 appModel: appModel,
                 settingsModel: settingsModel
             )
+        },
+        openSettings: @escaping @MainActor () -> Void = {},
+        terminateApplication: @escaping @MainActor () -> Void = {
+            NSApplication.shared.terminate(nil)
         }
     ) {
         self.appModel = appModel
@@ -114,11 +121,19 @@ final class StatusItemController: StatusItemControllerLifecycle {
         let statusItem = statusItemFactory()
         self.statusItem = statusItem
         popoverPresenter = popoverFactory(appModel, settingsModel)
+        contextMenu = StatusItemContextMenu(
+            refresh: { appModel.refreshManually() },
+            openSettings: openSettings,
+            quit: terminateApplication
+        )
 
         let autosaveName = Self.autosaveName(bundleIdentifier: Bundle.main.bundleIdentifier)
         statusItem.setAutosaveName(autosaveName)
         statusItem.onActivate = { [weak self] in
             self?.toggleDashboard()
+        }
+        statusItem.onSecondaryActivate = { [weak self] in
+            self?.showContextMenu()
         }
         visibilityObservation = statusItem.observeVisibility { [weak self] isVisible in
             self?.settingsModel.menuBarItemVisibilityDidChange(isVisible)
@@ -198,6 +213,8 @@ final class StatusItemController: StatusItemControllerLifecycle {
         visibilityObservation?.invalidate()
         visibilityObservation = nil
         statusItem.onActivate = nil
+        statusItem.onSecondaryActivate = nil
+        contextMenu.teardown()
         popoverPresenter.teardown()
         statusItem.teardown()
     }
@@ -258,6 +275,12 @@ final class StatusItemController: StatusItemControllerLifecycle {
         appModel.menuDidOpen()
         popoverPresenter.show(relativeTo: anchorView)
     }
+
+    private func showContextMenu() {
+        guard !isTornDown else { return }
+        if popoverPresenter.isShown { popoverPresenter.close() }
+        statusItem.showContextMenu(contextMenu.menu)
+    }
 }
 
 @MainActor
@@ -284,8 +307,13 @@ private final class SystemStatusItemHandle: StatusItemHandling {
         button.imageHugsTitle = StatusItemButtonStyle.imageHugsTitle
         button.target = actionTarget
         button.action = #selector(StatusItemActionTarget.activate)
+        button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         actionTarget.action = { [weak self] in
-            self?.onActivate?()
+            if NSApplication.shared.currentEvent?.type == .rightMouseUp {
+                self?.onSecondaryActivate?()
+            } else {
+                self?.onActivate?()
+            }
         }
     }
 
@@ -297,6 +325,16 @@ private final class SystemStatusItemHandle: StatusItemHandling {
     var anchorView: NSView? { statusItem.button }
 
     var onActivate: (@MainActor () -> Void)?
+    var onSecondaryActivate: (@MainActor () -> Void)?
+
+    func showContextMenu(_ menu: NSMenu) {
+        guard !isTornDown, let button = statusItem.button else { return }
+        menu.popUp(
+            positioning: nil,
+            at: NSPoint(x: button.bounds.minX, y: button.bounds.minY),
+            in: button
+        )
+    }
 
     func setAutosaveName(_ name: String) {
         statusItem.autosaveName = name

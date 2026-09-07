@@ -4,6 +4,107 @@ import XCTest
 
 @MainActor
 final class StatusItemControllerTests: XCTestCase {
+    func testRightClickReusesNativeMenuAndKeepsLeftClickAndPresentationWorking() async throws {
+        let fixture = makeFixture()
+        defer { fixture.cleanup() }
+        let item = TestStatusItemHandle()
+        let popover = TestStatusItemPopover()
+        var creations = 0
+        var settingsCount = 0
+        var quitCount = 0
+        let controller = StatusItemController(
+            appModel: fixture.appModel, settingsModel: fixture.settingsModel,
+            statusItemFactory: { creations += 1; return item },
+            popoverFactory: { _, _ in popover },
+            openSettings: { settingsCount += 1 },
+            terminateApplication: { quitCount += 1 }
+        )
+        defer { controller.teardown() }
+        item.activate()
+        XCTAssertTrue(popover.isShown)
+        item.onSecondaryActivate?()
+        XCTAssertFalse(popover.isShown)
+        XCTAssertEqual(item.shownMenus.count, 1)
+        let menu = try XCTUnwrap(item.shownMenus.first)
+        for _ in 0..<100 { item.onSecondaryActivate?() }
+        XCTAssertEqual(item.shownMenus.count, 101)
+        XCTAssertTrue(item.shownMenus.allSatisfy { $0 === menu })
+        XCTAssertEqual(menu.items.count, 4)
+        XCTAssertEqual(creations, 1)
+        XCTAssertEqual(item.visibilityObservationCount, 1)
+        menu.performActionForItem(at: 1)
+        menu.performActionForItem(at: 3)
+        XCTAssertEqual(settingsCount, 1)
+        XCTAssertEqual(quitCount, 1)
+        XCTAssertTrue(fixture.store.isMenuBarItemRequested)
+        XCTAssertEqual(fixture.store.onboardingState, .neverShown)
+        XCTAssertTrue(fixture.store.isCodexEnabled)
+
+        item.activate()
+        XCTAssertTrue(popover.isShown)
+        item.activate()
+        XCTAssertFalse(popover.isShown)
+        let updated = expectation(description: "Presentation still updates after context menu")
+        item.onPresentation = { _ in updated.fulfill() }
+        fixture.settingsModel.setUsagePresentationMode(.used)
+        await fulfillment(of: [updated], timeout: 1)
+        XCTAssertEqual(creations, 1)
+
+        controller.teardown()
+        XCTAssertNil(item.onSecondaryActivate)
+        XCTAssertTrue(menu.items.allSatisfy { $0.target == nil && $0.action == nil })
+        XCTAssertEqual(item.teardownCount, 1)
+        XCTAssertEqual(item.observationInvalidationCount, 1)
+    }
+
+    func testNativeMenuTitlesShortcutsAndActionsInBothLanguages() {
+        for (locale, titles) in [
+            (Locale(identifier: "en"), ["Refresh Now", "Settings…", "", "Quit QuotaMew"]),
+            (Locale(identifier: "zh-Hant-TW"), ["立即重新整理", "設定…", "", "退出 QuotaMew"]),
+        ] {
+            var calls = [0, 0, 0]
+            let context = StatusItemContextMenu(
+                refresh: { calls[0] += 1 }, openSettings: { calls[1] += 1 },
+                quit: { calls[2] += 1 }, locale: locale
+            )
+            XCTAssertEqual(context.menu.items.map(\.title), titles)
+            XCTAssertTrue(context.menu.items[2].isSeparatorItem)
+            XCTAssertEqual(context.menu.items.map(\.keyEquivalent), ["", "", "", "q"])
+            XCTAssertEqual(context.menu.items[3].keyEquivalentModifierMask, .command)
+            for index in [0, 1, 3] { context.menu.performActionForItem(at: index) }
+            XCTAssertEqual(calls, [1, 1, 1])
+            context.teardown()
+        }
+    }
+
+    func testContextRefreshUsesExistingAppModelCoalescing() async throws {
+        let fixture = makeFixture()
+        defer { fixture.cleanup() }
+        let readStarted = expectation(description: "Manual refresh enters provider once")
+        let provider = ContextMenuTestProvider { readStarted.fulfill() }
+        let appModel = AppModel(
+            providerIDs: [.codex],
+            refreshCoordinator: RefreshCoordinator(usageService: UsageService(providers: [provider])),
+            notificationService: StatusItemTestNotificationService(), observesLifecycle: false
+        )
+        let item = TestStatusItemHandle()
+        let controller = StatusItemController(
+            appModel: appModel, settingsModel: fixture.settingsModel,
+            statusItemFactory: { item }, popoverFactory: { _, _ in TestStatusItemPopover() }
+        )
+        defer { controller.teardown() }
+        item.onSecondaryActivate?()
+        let menu = try XCTUnwrap(item.shownMenus.first)
+        XCTAssertFalse(appModel.isRefreshing, "Opening the menu alone must not refresh")
+        menu.performActionForItem(at: 0)
+        await fulfillment(of: [readStarted], timeout: 1)
+        XCTAssertTrue(appModel.isRefreshing)
+        for _ in 0..<20 { menu.performActionForItem(at: 0) }
+        let reads = await provider.readCount
+        XCTAssertEqual(reads, 1)
+        await provider.finish()
+    }
+
     func testControllerCreatesOneStatusItemAndUsesIdentityScopedAutosaveName() {
         let fixture = makeFixture()
         defer { fixture.cleanup() }
@@ -309,7 +410,7 @@ final class StatusItemControllerTests: XCTestCase {
         var controllerCreationCount = 0
         let lifecycle = TestStatusItemControllerLifecycle()
         let delegate = QuotaMewApplicationDelegate(
-            controllerFactory: { appModel, settingsModel in
+            controllerFactory: { appModel, settingsModel, _ in
                 XCTAssertTrue(appModel === fixture.appModel)
                 XCTAssertTrue(settingsModel === fixture.settingsModel)
                 controllerCreationCount += 1
@@ -346,7 +447,7 @@ final class StatusItemControllerTests: XCTestCase {
         var controllerCreationCount = 0
         var terminationCount = 0
         let delegate = QuotaMewApplicationDelegate(
-            controllerFactory: { _, _ in
+            controllerFactory: { _, _, _ in
                 controllerCreationCount += 1
                 return TestStatusItemControllerLifecycle()
             },
@@ -438,6 +539,12 @@ private final class TestStatusItemHandle: StatusItemHandling {
     }
     let anchorView: NSView? = NSView()
     var onActivate: (@MainActor () -> Void)?
+    var onSecondaryActivate: (@MainActor () -> Void)?
+    private(set) var shownMenus: [NSMenu] = []
+
+    func showContextMenu(_ menu: NSMenu) {
+        shownMenus.append(menu)
+    }
     var onVisibilitySet: ((Bool) -> Void)?
     var onPresentation: ((StatusItemButtonPresentation) -> Void)?
     private(set) var autosaveName: String?
@@ -538,5 +645,31 @@ private final class StatusItemTestLaunchAtLoginController: LaunchAtLoginControll
     func refreshStatus() {}
     func setEnabled(_ enabled: Bool) throws {
         status = enabled ? .enabled : .disabled
+    }
+}
+
+private actor ContextMenuTestProvider: UsageProvider {
+    nonisolated let id = ProviderID.codex
+    private let onRead: @Sendable () -> Void
+    private(set) var readCount = 0
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    init(onRead: @escaping @Sendable () -> Void) { self.onRead = onRead }
+
+    func fetchUsage() async throws -> ProviderUsageSnapshot {
+        readCount += 1
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+            onRead()
+        }
+        return ProviderUsageSnapshot(
+            providerID: .codex, windows: [], capturedAt: .now,
+            source: UsageSource(kind: .mock, label: "Test", documentationURL: nil)
+        )
+    }
+
+    func finish() {
+        continuation?.resume()
+        continuation = nil
     }
 }
