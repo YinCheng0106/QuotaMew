@@ -43,7 +43,7 @@ ChatGPT.app support relies on an undocumented packaging detail: the bundled Code
 
 ### Download the beta
 
-The current public release is **QuotaMew v0.2.0 Beta 2**. Beta 1 was released under the previous QuotaPulse name; its historical release records and artifacts retain that name.
+The current public release is **QuotaMew v0.2.0 Beta 3**. Beta 1 was released under the previous QuotaPulse name; its historical release records and artifacts retain that name.
 
 Download the latest DMG from the [GitHub Releases](https://github.com/YinCheng0106/QuotaMew/releases) page.
 
@@ -139,11 +139,11 @@ Do not attach raw app-server output, Codex session files, authentication files, 
 
 ## Roadmap
 
-The unreleased Product Polish source uses shared **5-hour / Weekly** window names in Dashboard, VoiceOver, and notifications, based on exact normalized durations. Unknown durations use a safe generic name. **Luna Reserve** appears as a compact secondary row while regular Codex quota is usable; it expands when a fresh, valid regular window is exhausted. This is a display rule, not a claim that Reserve is active or usable. Reserve never replaces the regular menu-bar metric and does not send reset notifications.
+The Beta 3 release uses shared **5-hour / Weekly** window names in Dashboard, VoiceOver, and notifications, based on exact normalized durations. Unknown durations use a safe generic name. **Luna Reserve** appears as a compact secondary row while regular Codex quota is usable; it expands when a fresh, valid regular window is exhausted. This is a display rule, not a claim that Reserve is active or usable. Reserve never replaces the regular menu-bar metric and does not send reset notifications.
 
 Left-click toggles Dashboard. Right-click opens a native menu with **Refresh Now**, **Settings…**, and **Quit QuotaMew**, using the existing refresh, Settings scene, and normal termination paths.
 
-Milestones A and B are complete. **Milestone C — Onboarding remains required for v0.2 and is not implemented beyond its persistence contract.** Beta 3 is not released. Next: Onboarding and Product Polish acceptance → Beta 3 preparation → release hardening → RC 1 → v0.2.0. External Reset Intelligence feed/network/matching work is planned for v0.3. See [the v0.2 plan](docs/V0_2_PLAN.md) and [manual acceptance checklist](docs/RUNTIME_TESTING.md#v02-product-polish-acceptance).
+Milestones A and B, Product Polish, and **Milestone C — Onboarding** are complete in Beta 3. Next: release hardening → RC 1 → v0.2.0. External Reset Intelligence feed/network/matching work is planned for v0.3. See [the v0.2 plan](docs/V0_2_PLAN.md) and [manual acceptance checklist](docs/RUNTIME_TESTING.md#v02-product-polish-acceptance).
 
 QuotaMew now includes local reset-cycle detection. Future work may include a reviewed Claude Code opt-in bridge, broader provider and hardware validation, signed/notarized distribution, and source-linked official Reset Intelligence feed ingestion. These future items are not implemented claims. See [ROADMAP.md](ROADMAP.md).
 

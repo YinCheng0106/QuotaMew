@@ -22,7 +22,7 @@ Fresh migration 另做三種受控 domain：完全空白顯示一次；模擬 Be
 
 ## v0.2 Product Polish acceptance
 
-2026-09-07 新增；使用者回報以下 planned checks 全數通過，Product Polish manual acceptance **COMPLETE（user-observed）**。不因 XCTest/build 通過而代替人工 evidence。Public release 仍是 Beta 2，工作樹是未發行 source。既有長時間 runtime 手冊與下方歷史 Milestone B 證據繼續適用。
+2026-09-07 新增；使用者回報以下 planned checks 全數通過，Product Polish manual acceptance **COMPLETE（user-observed）**。不因 XCTest/build 通過而代替人工 evidence。這些 acceptance checks 已納入公開的 Beta 3；既有長時間 runtime 手冊與下方歷史 Milestone B 證據繼續適用。
 
 | # | 檢查 | 結果 |
 | --- | --- | --- |
@@ -173,7 +173,7 @@ App-hosted live tests 的 UserDefaults opt-in 也必須寫入 Debug domain：`ru
 
 主要開發帳號先前觀察到的 ChatGPT → QuotaPulse cascade，分類為歷史、使用者範圍的 macOS Control Center stale application association，與過往非典型開發／測試啟動拓撲有關，不是目前 QuotaPulse Release 架構缺陷。不要以程式清除或修復該 stale state；不要改 bundle identifier、`autosaveName` 或使用 private Control Center API。人工 menu-bar runtime 測試應從 Finder、Spotlight 或 `/usr/bin/open` 啟動 app bundle，不要從 Codex／ChatGPT 擁有的 shell 直接執行 Mach-O。
 
-Final status: **Hybrid NSStatusItem migration COMPLETE; Milestone A COMPLETE / frozen; Milestone B COMPLETE; Milestone C COMPLETE; Product Polish COMPLETE; Menu Bar Display Polish SOURCE COMPLETE / AUTOMATED VALIDATION COMPLETE / MANUAL ACCEPTANCE COMPLETE.** Next: v0.2.0-beta.3 release preparation / stabilization. Public release remains v0.2.0-beta.2; Beta 3 is not released and final v0.2.0 is not complete.
+Final status: **Hybrid NSStatusItem migration COMPLETE; Milestone A COMPLETE / frozen; Milestone B COMPLETE; Milestone C COMPLETE; Product Polish COMPLETE; Menu Bar Display Polish SOURCE COMPLETE / AUTOMATED VALIDATION COMPLETE / MANUAL ACCEPTANCE COMPLETE.** Beta 3 is released; next is release hardening toward RC 1. Final v0.2.0 is not complete.
 
 ### Autosave identity 與 status-item 寬度
 

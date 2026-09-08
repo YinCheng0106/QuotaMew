@@ -2,7 +2,7 @@
 
 本路線圖以成果為導向。在平臺基準與即時 provider 整合驗證完成前，刻意不承諾日期。
 
-目前公開版為 **QuotaMew v0.2.0-beta.2**。以下歷史 milestone／strategy records 保留原決策；目前 scope 以本文最後的 **2026-09-07 v0.2 規劃決策**及 [V0_2_PLAN.md](docs/V0_2_PLAN.md) 為準。
+目前公開版為 **QuotaMew v0.2.0-beta.3**。以下歷史 milestone／strategy records 保留原決策；目前 scope 以本文最後的 **2026-09-07 v0.2 規劃決策**及 [V0_2_PLAN.md](docs/V0_2_PLAN.md) 為準。
 
 ## Milestone 0 — 規劃基準
 
@@ -242,6 +242,6 @@ Local completed-reset notification、Diagnostics、disabled-provider lifecycle �
 
 **原 D/E 的外部 feed reader/network/cache/service 與 event/local matching 移至 v0.3**；保留 Milestone A 合約與 fixtures，不實作外部來源功能。
 
-版本順序：**C + Product Polish acceptance → v0.2.0-beta.3 → release hardening → v0.2.0-rc.1 → v0.2.0**。目前只有 Beta 2 已公開提供 DMG；Beta 3 尚未發行，Developer ID signing 與 notarization 仍未完成。本次不提交、推送、tag、打包或發布。
+版本順序：**C + Product Polish acceptance → v0.2.0-beta.3 → release hardening → v0.2.0-rc.1 → v0.2.0**。Beta 3 已公開提供 DMG；Developer ID signing 與 notarization 仍未完成。Reset Intelligence 維持 v0.3 scope。
 
 完整候選評估、架構、驗收條件與實作順序見 [`docs/V0_2_PLAN.md`](docs/V0_2_PLAN.md)。

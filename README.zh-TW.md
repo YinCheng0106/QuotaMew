@@ -43,7 +43,7 @@ ChatGPT.app 支援依賴未文件化的封裝細節：內附 Codex runtime 的�
 
 ### 下載 Beta 版本
 
-目前公開版本為 **QuotaMew v0.2.0 Beta 2**。Beta 1 以先前的 QuotaPulse 名稱發行，其歷史發行紀錄與產物保留原名。
+目前公開版本為 **QuotaMew v0.2.0 Beta 3**。Beta 1 以先前的 QuotaPulse 名稱發行，其歷史發行紀錄與產物保留原名。
 
 請從 [GitHub Releases](https://github.com/YinCheng0106/QuotaMew/releases) 下載最新的 DMG。
 
@@ -139,11 +139,11 @@ QuotaMew 優先採用事件驅動更新、保守的刷新週期、有上限的 p
 
 ## 路線圖
 
-尚未發行的 Product Polish 原始碼依精確的正規化 duration，讓 Dashboard、VoiceOver 與通知共用「**5 小時／每週**」名稱；未知長度採安全的通用名稱。**Luna Reserve** 平常以次要精簡列呈現，只有新鮮、有效的一般 Codex 視窗耗盡時才展開。這是顯示規則，不代表 Reserve 已啟用或保證可用；它不取代選單列的一般額度，也不發送重設通知。
+Beta 3 依精確的正規化 duration，讓 Dashboard、VoiceOver 與通知共用「**5 小時／每週**」名稱；未知長度採安全的通用名稱。**Luna Reserve** 平常以次要精簡列呈現，只有新鮮、有效的一般 Codex 視窗耗盡時才展開。這是顯示規則，不代表 Reserve 已啟用或保證可用；它不取代選單列的一般額度，也不發送重設通知。
 
 左鍵維持切換 Dashboard；右鍵開啟原生選單，提供「**立即重新整理**」、「**設定…**」與「**退出 QuotaMew**」，沿用既有刷新、Settings scene 與正常結束流程。
 
-Milestone A／B 已完成。**Milestone C — Onboarding 仍為 v0.2 必要項目，目前僅有持久化合約，尚未實作 UI。** Beta 3 尚未發行。順序為 Onboarding 與 Product Polish 驗收 → Beta 3 準備 → release hardening → RC 1 → v0.2.0。外部 Reset Intelligence feed／network／matching 工作移至 v0.3。詳見 [v0.2 計畫](docs/V0_2_PLAN.md) 與[人工驗收清單](docs/RUNTIME_TESTING.md#v02-product-polish-acceptance)。
+Milestone A／B、Product Polish 與 **Milestone C — Onboarding** 已在 Beta 3 完成。下一步為 release hardening → RC 1 → v0.2.0。外部 Reset Intelligence feed／network／matching 工作移至 v0.3。詳見 [v0.2 計畫](docs/V0_2_PLAN.md) 與[人工驗收清單](docs/RUNTIME_TESTING.md#v02-product-polish-acceptance)。
 
 QuotaMew 現已包含本機 reset-cycle detection。未來可能進行經審查的 Claude Code opt-in bridge、更廣泛的 provider 與硬體驗證、簽章與 notarization，以及保留來源連結的官方 Reset Intelligence feed 擷取；這些未來項目都不是目前已實作功能。詳情請參閱 [ROADMAP.md](ROADMAP.md)。
 

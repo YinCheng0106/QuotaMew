@@ -8,14 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-beta.3] - 2026-09-08
+
+### Added
+
+- Added a native first-run onboarding experience covering provider status, privacy boundaries, quota presentation, provider pinning, Launch at Login, and optional notifications.
+- Added configurable menu bar quota display modes: Single and Overview, with 5-hour, Weekly, and conservative Luna Reserve presentation.
+- Added a native status-item context menu for Refresh Now, Settings…, and Quit QuotaMew.
+
 ### Changed
 
 - Share duration-based 5-hour / Weekly window names across Dashboard, VoiceOver, and reset notifications, with a safe generic fallback.
 - Present Luna Reserve as secondary fallback information, expanding it only for fresh regular-quota exhaustion; keep regular quota as the menu-bar metric and suppress Reserve reset notifications.
-- Add a native status-item right-click menu for Refresh Now, Settings…, and Quit QuotaMew through existing application actions.
-- Correct current Beta 2 download instructions and document the v0.2 Onboarding and Product Polish acceptance gates. External Reset Intelligence reader/network/matching work is deferred to v0.3.
+- Improve Remaining / Used presentation, provider pinning, accessibility semantics, intrinsic-width handling, and lifecycle/recovery behavior.
+- Update English and Traditional Chinese product and release documentation for the Beta 3 scope.
 
-These source changes are not a Beta 3 release. Application version/build metadata remains 0.2.0 (2) pending the release preparation task.
+### Distribution
+
+- Beta 3 is distributed as a QuotaMew DMG.
+- Developer ID signing and Apple notarization are not yet available.
+- Reset Intelligence remains deferred to v0.3; Claude Code remains Experimental / Unverified.
 
 ## [0.2.0-beta.2] - 2026-09-06
 

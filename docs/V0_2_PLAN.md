@@ -1,7 +1,7 @@
 # QuotaMew v0.2 產品範圍
 
 > 更新：2026-09-08。本決策取代 2026-08-31 將外部 feed reader/matching 納入 v0.2 的規劃。
-> 公開版本：**v0.2.0-beta.2 — QuotaMew v0.2.0 Beta 2**。Beta 3 尚未發行。
+> 公開版本：**v0.2.0-beta.3 — QuotaMew v0.2.0 Beta 3**。v0.2.0 final 尚未發行。
 
 ## 產品目標與里程碑
 
@@ -16,7 +16,7 @@ v0.2 聚焦隱私優先的本機額度呈現、可靠的原生選單列操作與
 | Menu Bar Display Polish | **COMPLETE**。SOURCE COMPLETE、AUTOMATED VALIDATION COMPLETE、MANUAL ACCEPTANCE COMPLETE；Single／Overview、明確 quota selection、Beta 2 Weekly compatibility、conditional Reserve、完整 VoiceOver 語意與 bounded observation 均已完成。 |
 | Release acceptance | C、Product Polish 與 Menu Bar Display Polish 驗收 → **beta.3** → release hardening → **rc.1** → **v0.2.0**。 |
 
-Milestone C source implementation 與 manual acceptance 均完成；這不代表 Beta 3 已發行或 v0.2.0 final 已完成。Public release 仍是 **v0.2.0-beta.2**；Reset Intelligence 仍屬 v0.3。
+Milestone C source implementation 與 manual acceptance 均完成；Beta 3 已發行，v0.2.0 final 尚未完成。Reset Intelligence 仍屬 v0.3。
 
 ## v0.2 交付範圍
 
@@ -132,8 +132,8 @@ Visible identifiers `5H`／`W`／`R` 保持語言中立；accessibility value �
 
 目前 Xcode app target 的 Debug／Release 都由 MARKETING_VERSION = 0.2.0 與 CURRENT_PROJECT_VERSION = 2 產生 Info.plist；test target 自有版本不是 App 對外版本。Beta 字尾只存在 Git tag／發行產物命名，packaging script 不修改 Info.plist。
 
-Git 歷史 fbbc449 與 a077596 顯示版本／build number 在 release preparation 更新。本次保留 App **0.2.0 (2)**，以 CHANGELOG Unreleased 記錄。
+Git 歷史 fbbc449 與 a077596 顯示版本／build number 在 release preparation 更新。本次 Beta 3 使用 App **0.2.0 (3)**，歷史 Beta 2 維持 **0.2.0 (2)**。
 
-**下一項任務：v0.2.0-beta.3 release preparation / stabilization。** 另行把兩個 App configuration 的 build number 更新為 3，保留 marketing version 0.2.0，驗證 Release artifact，再依明確授權準備 `release/v0.2.0-beta.3/QuotaMew.app`。既有打包指令為 `./script/create-dmg.sh 0.2.0-beta.3`；它必須在後續發行任務才執行，不是本次命令。Do not mark v0.2.0-beta.3 released or final v0.2.0 complete here。
+**下一項任務：release hardening / RC 1。** Beta 3 使用兩個 App configuration 的 marketing version `0.2.0` 與 build number `3`，並以 `./script/create-dmg.sh 0.2.0-beta.3` 產生發行產物。v0.2.0 final 尚未完成；Reset Intelligence 仍為 v0.3。
 
 不得把編譯／XCTest 視為 VoiceOver、真實通知送達、Launch at Login、Developer ID signing、notarization 或 DMG 發行證據。
