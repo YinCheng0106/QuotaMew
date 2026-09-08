@@ -51,6 +51,78 @@ Reserve 耗盡條件可先用 synthetic preview/fixture 檢查，不為驗收耗
 
 自動化證據、名稱殘留分類與版本下一步見 [PRODUCT_POLISH_AUDIT.md](PRODUCT_POLISH_AUDIT.md)。
 
+## v0.2 Menu Bar Display Polish manual acceptance（COMPLETE）
+
+2026-09-08 source implementation、automated validation 與 user-observed manual acceptance 均完成。使用者已驗證下列 36 項：title composition、Settings controls、最寬 Overview、VoiceOver、English／繁中、MacBook menu-bar／notch、左右鍵互動、recovery、Login Item、Onboarding、既有 5-hour／Weekly 命名、Luna Reserve 與 notifications regression。此人工證據不宣稱未捕獲的額外寬度量測；寬度數值仍以 automated intrinsic-width tests 與既有 controlled AppKit baseline 為準。Reserve-prominent case 可用 synthetic fixture／preview，不耗用真實額度、不改 provider data。
+
+### Single
+
+| # | 人工操作與通過條件 | 狀態 |
+| ---: | --- | --- |
+| 1 | Settings → General → Menu Bar 選 Single + Weekly；顯示 `W n%`，重啟後仍保留 | 使用者回報通過 |
+| 2 | 改選 5-hour；顯示 `5H n%`，不顯示 Weekly 值 | 使用者回報通過 |
+| 3 | 改選 Luna Reserve；有有效 window 時顯示 `R n%`，沒有時顯示 `R —` | 使用者回報通過 |
+| 4 | Remaining 下三種 metric 都使用剩餘百分比 | 使用者回報通過 |
+| 5 | Used 下三種 metric 都使用已使用百分比，identifier 不變 | 使用者回報通過 |
+| 6 | 所選 window 缺少／無效時顯示該 metric 的 `—`，不 fallback 到別的 metric／provider | 使用者回報通過 |
+| 7 | 切換 style／quota／Remaining／Used／pin 後，同一 status item 立即更新，不開 Dashboard、不 refresh | 使用者回報通過 |
+
+### Overview
+
+| # | 人工操作與通過條件 | 狀態 |
+| ---: | --- | --- |
+| 8 | 一般狀態顯示 `5H n% · W n%`，順序固定且沒有 provider 名稱重複 | 使用者回報通過 |
+| 9 | 一般可用 quota 下不顯示 R | 使用者回報通過 |
+| 10 | 既有 fresh trusted regular-exhaustion predicate 成立時才顯示第三項 `R n%` | 使用者回報通過 |
+| 11 | Remaining 同時正確套用到 5H、W 與條件式 R | 使用者回報通過 |
+| 12 | Used 同時正確套用到 5H、W 與條件式 R | 使用者回報通過 |
+
+### Width／crowding
+
+| # | 人工操作與通過條件 | 狀態 |
+| ---: | --- | --- |
+| 13 | Single 的 0% variants 不截斷，icon 與 title 對齊 | 使用者回報通過 |
+| 14 | Single／Overview 的 71% variants 不截斷 | 使用者回報通過 |
+| 15 | Single 的 100% variants 不截斷 | 使用者回報通過 |
+| 16 | `5H 100% · W 100%` 保持 standard button 與完整文字 | 使用者回報通過 |
+| 17 | `5H 100% · W 100% · R 100%` 保持完整文字；寬度數值以 automated intrinsic-width evidence 為準 | 使用者回報通過 |
+| 18 | 前景 App 選單較長、其他 status items 較多時，沒有自動切模式、抖動或 polling | 使用者回報通過 |
+| 19 | MacBook notch／menu-bar allowance 的 system hiding 不被誤判為 content truncation | 使用者回報通過 |
+
+### Interaction
+
+| # | 人工操作與通過條件 | 狀態 |
+| ---: | --- | --- |
+| 20 | 左鍵仍只切換既有 Dashboard | 使用者回報通過 |
+| 21 | 右鍵仍只顯示一份原生 menu，不同時開 Dashboard | 使用者回報通過 |
+| 22 | Refresh Now 走既有 coalesced refresh，重複按不重疊 | 使用者回報通過 |
+| 23 | Settings… 開啟／重用既有 Settings scene，Menu Bar controls 可操作 | 使用者回報通過 |
+| 24 | Quit 正常終止並清理 owned resources，不改 presentation preferences | 使用者回報通過 |
+
+### Accessibility／localization
+
+| # | 人工操作與通過條件 | 狀態 |
+| ---: | --- | --- |
+| 25 | Single VoiceOver 讀 provider、完整 quota 名稱與 Remaining／Used，不只讀 W／5H | 使用者回報通過 |
+| 26 | Overview VoiceOver 按 5-hour、Weekly、conditional Reserve 順序讀完整敘述 | 使用者回報通過 |
+| 27 | Reserve VoiceOver 說 Luna Reserve，不讀 raw ID／provider label | 使用者回報通過 |
+| 28 | English Settings、visible title 與 VoiceOver 文法清楚 | 使用者回報通過 |
+| 29 | 繁體中文（臺灣）Settings 與 VoiceOver 使用「5 小時／每週／剩餘／已使用」語意 | 使用者回報通過 |
+
+### Regression
+
+| # | 人工操作與通過條件 | 狀態 |
+| ---: | --- | --- |
+| 30 | requested OFF 的 explicit reopen／Show recovery 沿用原流程，presentation preferences 不變 | 使用者回報通過 |
+| 31 | Settings hide/show 只改同一個 item visibility；style／quota 不改 persisted visibility intent | 使用者回報通過 |
+| 32 | 安裝於獨立 Debug path 後驗證 Launch at Login；hidden quiet-exit 與 visible launch 不變 | 使用者回報通過 |
+| 33 | Onboarding fresh first-run、完成／略過／重看不新增進階 controls，且保留新 defaults／既有值 | 使用者回報通過 |
+| 34 | Dashboard 的 Luna Reserve secondary／prominent behavior 與安全文案不變 | 使用者回報通過 |
+| 35 | Dashboard／notifications 的 5-hour／Weekly 完整名稱不變，不被 5H／W 取代 | 使用者回報通過 |
+| 36 | approaching／completed notification behavior 與 Reserve exclusion 不變 | 使用者回報通過 |
+
+受控 AppKit measurement（標準 button、small monospaced-digit title）提供 layout baseline，不是實際螢幕驗收：有 icon／無 icon依序為 W `63.5–77.5／46–60` pt、5H `67.5–81.5／50–64` pt、R `59.5–73.5／42–56` pt、regular Overview `110.5–138.5／93–121` pt、Overview + R `156.5–191.5／139–174` pt。Production 保留 icon 與 intrinsic-width policy；人工檢查不得加入 fixed width、NBSP、kerning 或 custom view workaround。
+
 效能門檻以 [`docs/PERFORMANCE.md`](PERFORMANCE.md) 為唯一來源。本文件負責測試步驟與紀錄格式。
 
 ## 1. 前置條件
@@ -101,22 +173,22 @@ App-hosted live tests 的 UserDefaults opt-in 也必須寫入 Debug domain：`ru
 
 主要開發帳號先前觀察到的 ChatGPT → QuotaPulse cascade，分類為歷史、使用者範圍的 macOS Control Center stale application association，與過往非典型開發／測試啟動拓撲有關，不是目前 QuotaPulse Release 架構缺陷。不要以程式清除或修復該 stale state；不要改 bundle identifier、`autosaveName` 或使用 private Control Center API。人工 menu-bar runtime 測試應從 Finder、Spotlight 或 `/usr/bin/open` 啟動 app bundle，不要從 Codex／ChatGPT 擁有的 shell 直接執行 Mach-O。
 
-Final status: **Hybrid NSStatusItem migration COMPLETE; Milestone A COMPLETE / frozen; Milestone B COMPLETE; Milestone C COMPLETE; Product Polish COMPLETE.** Next: v0.2 Menu Bar Display Polish／Beta 3 stabilization work. Public release remains v0.2.0-beta.2; Beta 3 is not released and final v0.2.0 is not complete.
+Final status: **Hybrid NSStatusItem migration COMPLETE; Milestone A COMPLETE / frozen; Milestone B COMPLETE; Milestone C COMPLETE; Product Polish COMPLETE; Menu Bar Display Polish SOURCE COMPLETE / AUTOMATED VALIDATION COMPLETE / MANUAL ACCEPTANCE COMPLETE.** Next: v0.2.0-beta.3 release preparation / stabilization. Public release remains v0.2.0-beta.2; Beta 3 is not released and final v0.2.0 is not complete.
 
 ### Autosave identity 與 status-item 寬度
 
 - Debug stable autosave identity 固定為 `dev.quotapulse.development.app.primary-status-item`；Release 固定為 `dev.quotapulse.app.primary-status-item`。2026-09-02 的 temporary `primary-status-item-v2` 實驗沒有中斷 ChatGPT cascade，因此不得保留 v2 或繼續輪替 identity。
 - 標準 button 固定使用 template SF Symbol、`.imageLeading`、`imageHugsTitle = true`、`.scaleProportionallyDown` 與沒有前後空白的 monospaced-digit title。
 - `NSStatusItem` 以 `variableLength` 建立，但內容設定後的最終 `length` 必須由 `button.intrinsicContentSize.width` 導出，且不小於 `NSStatusBar.thickness`。不得用固定 percentage 寬度、空白、負 kerning 或 custom view 壓縮。
-- 人工量測 `—`、`0%`、`61%`、`100%` 時，分別記錄 item length、button bounds、intrinsic width、image/title rect；拖曳前後另外記錄 button frame。frame 外的鄰接 spacing、overflow 與 notch placement 屬 macOS，不應用 QuotaMew 內容 hack 消除。
+- 人工量測 `W`／`5H`／`R` 的 `—`、`0%`、`71%`、`100%`，以及 regular／Reserve Overview 時，分別記錄 item length、button bounds、intrinsic width、image/title rect；拖曳前後另外記錄 button frame。frame 外的鄰接 spacing、overflow 與 notch placement 屬 macOS，不應用 QuotaMew 內容 hack 消除。
 
 ### Menu bar label 的證據邊界
 
 選單列 compact label 必須把三種證據分開記錄：
 
 1. `UsagePresentationTests` 與 `MenuBarPresentation` tests 只驗證 percentage、placeholder 與 provider selection 等 presentation-model contract。
-2. `SettingsIntegrationTests.testMenuBarPresentationObservationInvalidatesForPinAndUsageModeChanges` 只驗證 SwiftUI Observation 讀取的 runtime model 會因 pin 與 Remaining／Used 改變而 invalidated，並驗證這些變更不觸發 provider refresh、notification 或 reset pipeline。
-3. XCTest 與 controller fake 都不能證明 macOS system status item 實際渲染文字。修改 label composition 後，必須用 fresh Debug artifact、單一 `dev.quotapulse.development.app` process 與真實選單列做人工檢查：production standard status button 應同時顯示 template icon 與 compact percentage／placeholder。不得將 DEBUG probe、timer 或 bundle identity workaround 留在 production。
+2. `SettingsIntegrationTests.testMenuBarPresentationObservationInvalidatesForEveryPresentationPreference` 只驗證 Swift Observation 讀取的 runtime model 會因 pin、display style、quota selection 與 Remaining／Used 改變而 invalidated；另一個 integration test 驗證這些變更不觸發 provider refresh、notification 或 reset pipeline。
+3. XCTest 與 controller fake 都不能證明 macOS system status item 實際渲染文字。修改 label composition 後，必須用 fresh Debug artifact、單一 `dev.quotapulse.development.app` process 與真實選單列做人工檢查：production standard status button 應同時顯示 template icon 與 compact semantic metric／placeholder。不得將 DEBUG probe、timer 或 bundle identity workaround 留在 production。
 
 做視覺比對時，讓 Finder 等選單較短的 App 位於前景。macOS 可能因前景 App 選單與其他 status items 佔用寬度而暫時隱藏整個 QuotaMew item；不要把相鄰第三方圖示誤認為 QuotaMew，也不要由 process、UserDefaults 或 Control Center toggle 推論實際可見性。
 

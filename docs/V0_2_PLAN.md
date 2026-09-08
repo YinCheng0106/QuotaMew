@@ -1,6 +1,6 @@
 # QuotaMew v0.2 產品範圍
 
-> 更新：2026-09-07。本決策取代 2026-08-31 將外部 feed reader/matching 納入 v0.2 的規劃。
+> 更新：2026-09-08。本決策取代 2026-08-31 將外部 feed reader/matching 納入 v0.2 的規劃。
 > 公開版本：**v0.2.0-beta.2 — QuotaMew v0.2.0 Beta 2**。Beta 3 尚未發行。
 
 ## 產品目標與里程碑
@@ -13,7 +13,8 @@ v0.2 聚焦隱私優先的本機額度呈現、可靠的原生選單列操作與
 | B — Display + Settings | **COMPLETE**。Hybrid NSStatusItem、Remaining／Used、pin、Settings、recovery 與 zero-XCTest-host gates 已完成。 |
 | C — Onboarding | **COMPLETE**。Source implementation 與 2026-09-07 user-observed manual runtime/UI acceptance 均完成；單頁原生 UI、啟動優先序、首次／重看語意、明確通知授權與 migration boundaries 已驗收。 |
 | Product Polish | **COMPLETE**。額度命名、Luna Reserve 呈現、右鍵選單與公開文件修正已完成；驗證見 [Product Polish 稽核](PRODUCT_POLISH_AUDIT.md)，planned manual acceptance 已由使用者回報全數通過。 |
-| Release acceptance | C 與 Product Polish 驗收 → **beta.3** → release hardening → **rc.1** → **v0.2.0**。 |
+| Menu Bar Display Polish | **COMPLETE**。SOURCE COMPLETE、AUTOMATED VALIDATION COMPLETE、MANUAL ACCEPTANCE COMPLETE；Single／Overview、明確 quota selection、Beta 2 Weekly compatibility、conditional Reserve、完整 VoiceOver 語意與 bounded observation 均已完成。 |
+| Release acceptance | C、Product Polish 與 Menu Bar Display Polish 驗收 → **beta.3** → release hardening → **rc.1** → **v0.2.0**。 |
 
 Milestone C source implementation 與 manual acceptance 均完成；這不代表 Beta 3 已發行或 v0.2.0 final 已完成。Public release 仍是 **v0.2.0-beta.2**；Reset Intelligence 仍屬 v0.3。
 
@@ -21,6 +22,7 @@ Milestone C source implementation 與 manual acceptance 均完成；這不代表
 
 - 一個 production NSStatusItem／StatusItemController，原生 popover 承載既有 SwiftUI Dashboard。
 - Remaining／Used、固定 provider、General／Providers／Notifications Settings。
+- Single／Overview 選單列顯示，以及獨立的 5-hour／Weekly／Luna Reserve quota selection。
 - 既有 lifecycle、hide/show、reopen/recovery、Launch at Login 行為與穩定身分。
 - 已完成的 QuotaMew 公開品牌更名，以及必要的相容性名稱保留。
 - 可略過、可重看的 Milestone C Onboarding。
@@ -72,7 +74,7 @@ UsageWindowPresentation 是純呈現值，接受 normalized UsageWindow，或 co
 
 只有 available、capture age 在 **0..<15 分鐘**，且一般 `codex.codex.primary/secondary` 的 5 小時或每週 window 有 **原始 usedPercentage == 100**、reset 仍在未來時，Reserve 才展開成完整列。任一一般 window 都可符合，不只 weekly。缺少資料、stale/failure/loading、未知 bucket/duration、99.9 的四捨五入或超界百分比都不能觸發。
 
-這只讓 fallback 資訊更容易找到，不聲稱 Reserve active、計費語意、資格或一定能繼續使用。Reserve-only snapshot 保留次要列，選單列顯示 unavailable，不用 Reserve 偷換一般額度。純 projection 不刷新、不持久化、不建立 history。
+這只讓 fallback 資訊更容易找到，不聲稱 Reserve active、計費語意、資格或一定能繼續使用。Reserve-only snapshot 在 Dashboard 保留次要列；Automatic／Overview 不用 Reserve 偷換一般額度，只有 Single + Luna Reserve 的明確使用者選擇可直接顯示有效 Reserve metric。純 projection 不刷新、不持久化、不建立 history。
 
 v0.2 **不送 Reserve approaching/completed reset notifications**：policy 排除提醒；service 在授權前排除 completed-reset delivery。一般 threshold、dedup identity、eligibility、provider generation 與 LocalResetDetector 演算法不變。Detector 原有 bounded current-cycle baseline 繼續更新，不增加 Reserve history store，也不清除既有使用者 state。
 
@@ -81,6 +83,39 @@ v0.2 **不送 Reserve approaching/completed reset notifications**：policy 排�
 既有標準 NSStatusBarButton 的公開 sendAction(on:) 接收左右 mouse-up；左鍵切換 Dashboard，右鍵由同一 controller 關閉 popover 並顯示同一份 NSMenu。不安裝 custom status view、global mouse monitor、timer 或第二個 item。
 
 Refresh 使用 AppModel.refreshManually()，保留 RefreshCoordinator 合併。Settings 經 App 的公開 SwiftUI openSettings action 開啟原有 Settings scene；Quit 呼叫正常 NSApplication.terminate，沿用既有 refresh/process/observer/controller cleanup，不改任何 preference。只有 Quit 配置 Command-Q；其餘使用原生 menu keyboard navigation。
+
+## Menu Bar Display Polish 決策
+
+### 顯示合約與預設
+
+選單列 provider pin、display style、quota selection 與 Remaining／Used 是四個分離的決策。`SettingsStore` 保存：
+
+- `presentation.menu-bar.display-style`：`single`／`overview`。
+- `presentation.menu-bar.quota-selection`：`fiveHour`／`weekly`／`lunaReserve`。
+
+兩個新值的 deterministic default 是 **Single + Weekly**。Beta 2 tag 的 implementation 只取 `snapshot.windows.first`，沒有 semantic selection contract；歷史 release runtime 的產品行為是 Weekly，因此缺少新 keys 的既有 domain 以 `W n%` 明示並保留原意。Fresh installation 使用相同預設，不另建隱性分支。未知 future raw value 只在 runtime 安全 fallback，不覆寫 storage；其他 preferences 不遷移。
+
+Single 顯示 `5H n%`、`W n%` 或 `R n%`，缺少所選 window 時顯示相同 identifier 加 `—`。Explicit provider pin 不 fallback 到別的 provider；explicit quota selection 也不 fallback 到別的 metric。Overview 固定為 5H、W，只有既有 `ProviderWindowsPresentation.showsReserveProminently` 為 true 且 Reserve usage 有效時才以第三項 R 加入；順序固定，不重複 metric，也不把 Reserve presence 描述為 active routing。
+
+5H／W 只對 normalized duration 精確等於 18,000／604,800 秒的 window 成立；Reserve 只沿用既有 Codex exact-ID allowlist。Claude 的 documented status-line snapshot 若提供同樣兩個明確 durations，可共用 Single／Overview；未知 durations 顯示 unavailable，不以 provider order、primary/secondary 或 raw label 猜測。
+
+### AppKit、寬度與無障礙
+
+既有唯一 `StatusItemController`／`NSStatusItem`、standard `NSStatusBarButton`、stable `autosaveName`、template image、popover、左右鍵、recovery 與 Login Item 全部保留。Presentation preferences 依 `SettingsStore → SettingsModel → MenuBarPresentation → StatusItemController` 更新同一個 button，不觸發 provider fetch、Codex RPC、notification evaluation、reset detection 或 scheduler work。100 次 style、quota 與 Remaining／Used 切換的 controller test 驗證仍只建立一個 owner／fake item 與一條 visibility observation。
+
+保留 icon，因為它維持識別、Single／Overview 一致性與可發現的 click target；移除只能固定節省 17.5 pt，卻不解決最寬 Overview 的 crowded-menu policy。受控 `NSStatusBarButton.intrinsicContentSize` 量測如下（pt）：
+
+| 文字 | 有 icon | 無 icon |
+| --- | ---: | ---: |
+| `W 0%`／`W 71%`／`W 100%` | 63.5／70.5／77.5 | 46／53／60 |
+| `5H 0%`／`5H 71%`／`5H 100%` | 67.5／74.5／81.5 | 50／57／64 |
+| `R 0%`／`R 71%`／`R 100%` | 59.5／66.5／73.5 | 42／49／56 |
+| `5H 0% · W 0%`／`5H 71% · W 71%`／`5H 100% · W 100%` | 110.5／124.5／138.5 | 93／107／121 |
+| `5H 0% · W 0% · R 71%`／`5H 100% · W 100% · R 100%` | 156.5／191.5 | 139／174 |
+
+Production 繼續以實際 button intrinsic width 設定 variable-length item，並以 status-bar thickness 作下限；沒有 hard-coded total width、NBSP、manual kerning、custom view 或 geometry polling。Overview 的較寬內容是使用者明確選擇；crowded／notch 狀態交給 macOS allowance 與既有 recovery，不自動切換模式。
+
+Visible identifiers `5H`／`W`／`R` 保持語言中立；accessibility value 不解析 visible title，而以完整名稱與 percentage projection 組合。英文例如 `Codex, 5-hour quota, 86% remaining; Weekly quota, 71% remaining`；繁中例如 `Codex，5 小時配額，剩餘 86%；每週配額，剩餘 71%`。Onboarding 不增加進階顯示 controls，但其 completion／skip／replay 會保留這兩個 preferences。
 
 ## v0.3 — Reset Intelligence
 
@@ -99,6 +134,6 @@ Refresh 使用 AppModel.refreshManually()，保留 RefreshCoordinator 合併。S
 
 Git 歷史 fbbc449 與 a077596 顯示版本／build number 在 release preparation 更新。本次保留 App **0.2.0 (2)**，以 CHANGELOG Unreleased 記錄。
 
-**下一項任務：v0.2 Menu Bar Display Polish／Beta 3 stabilization work。** Beta 3 release preparation 另行進行：把兩個 App configuration 的 build number 更新為 3，保留 marketing version 0.2.0，驗證 Release artifact，再依明確授權準備 `release/v0.2.0-beta.3/QuotaMew.app`。既有打包指令為 `./script/create-dmg.sh 0.2.0-beta.3`；它必須在後續發行任務才執行，不是本次命令。Do not mark v0.2.0-beta.3 released or final v0.2.0 complete here。
+**下一項任務：v0.2.0-beta.3 release preparation / stabilization。** 另行把兩個 App configuration 的 build number 更新為 3，保留 marketing version 0.2.0，驗證 Release artifact，再依明確授權準備 `release/v0.2.0-beta.3/QuotaMew.app`。既有打包指令為 `./script/create-dmg.sh 0.2.0-beta.3`；它必須在後續發行任務才執行，不是本次命令。Do not mark v0.2.0-beta.3 released or final v0.2.0 complete here。
 
 不得把編譯／XCTest 視為 VoiceOver、真實通知送達、Launch at Login、Developer ID signing、notarization 或 DMG 發行證據。
