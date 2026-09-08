@@ -38,6 +38,21 @@ enum AppLocalization {
         string("menu-bar.accessibility.unavailable \(providerName)", locale: locale)
     }
 
+    static func menuBarMetricAccessibility(
+        windowName: String,
+        usageDescription: String,
+        locale: Locale
+    ) -> String {
+        string(
+            "menu-bar.accessibility.metric \(windowName) \(usageDescription)",
+            locale: locale
+        )
+    }
+
+    static func menuBarAccessibilitySeparator(locale: Locale) -> String {
+        string("menu-bar.accessibility.separator", locale: locale)
+    }
+
     static func resetCountdown(_ countdown: String, locale: Locale) -> String {
         string("reset.countdown \(countdown)", locale: locale)
     }

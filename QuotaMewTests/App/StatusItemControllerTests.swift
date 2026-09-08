@@ -209,7 +209,7 @@ final class StatusItemControllerTests: XCTestCase {
         withExtendedLifetime(controller) {}
     }
 
-    func testPresentationChangeDoesNotRecreateStatusItem() async {
+    func testEveryPresentationPreferenceUpdatesTheSameStatusItem() async {
         let fixture = makeFixture()
         defer { fixture.cleanup() }
         let statusItem = TestStatusItemHandle()
@@ -225,12 +225,58 @@ final class StatusItemControllerTests: XCTestCase {
         )
         let initialPresentationCount = statusItem.presentations.count
 
-        let presentationUpdated = expectation(description: "Display mode is reapplied")
-        statusItem.onPresentation = { _ in presentationUpdated.fulfill() }
+        let quotaUpdated = expectation(description: "Quota selection is reapplied")
+        statusItem.onPresentation = { _ in quotaUpdated.fulfill() }
+        fixture.settingsModel.setMenuBarQuotaSelection(.fiveHour)
+        await fulfillment(of: [quotaUpdated], timeout: 1)
+
+        let styleUpdated = expectation(description: "Display style is reapplied")
+        statusItem.onPresentation = { _ in styleUpdated.fulfill() }
+        fixture.settingsModel.setMenuBarDisplayStyle(.overview)
+        await fulfillment(of: [styleUpdated], timeout: 1)
+
+        let modeUpdated = expectation(description: "Usage mode is reapplied")
+        statusItem.onPresentation = { _ in modeUpdated.fulfill() }
         fixture.settingsModel.setUsagePresentationMode(.used)
-        await fulfillment(of: [presentationUpdated], timeout: 1)
+        await fulfillment(of: [modeUpdated], timeout: 1)
 
         XCTAssertEqual(creationCount, 1)
+        XCTAssertEqual(statusItem.presentations.count, initialPresentationCount + 3)
+        XCTAssertEqual(statusItem.visibilityObservationCount, 1)
+        withExtendedLifetime(controller) {}
+    }
+
+    func testRepeatedPresentationSwitchingCoalescesWithoutAccumulatingOwnersOrObservers() async {
+        let fixture = makeFixture()
+        defer { fixture.cleanup() }
+        let statusItem = TestStatusItemHandle()
+        var creationCount = 0
+        let controller = StatusItemController(
+            appModel: fixture.appModel,
+            settingsModel: fixture.settingsModel,
+            statusItemFactory: {
+                creationCount += 1
+                return statusItem
+            },
+            popoverFactory: { _, _ in TestStatusItemPopover() }
+        )
+        let initialPresentationCount = statusItem.presentations.count
+        let reapplied = expectation(description: "Coalesced presentation is reapplied")
+        statusItem.onPresentation = { _ in reapplied.fulfill() }
+
+        for index in 0..<100 {
+            fixture.settingsModel.setMenuBarDisplayStyle(index.isMultiple(of: 2) ? .overview : .single)
+        }
+        for index in 0..<100 {
+            fixture.settingsModel.setMenuBarQuotaSelection(index.isMultiple(of: 2) ? .fiveHour : .weekly)
+        }
+        for index in 0..<100 {
+            fixture.settingsModel.setUsagePresentationMode(index.isMultiple(of: 2) ? .used : .remaining)
+        }
+
+        await fulfillment(of: [reapplied], timeout: 1)
+        XCTAssertEqual(creationCount, 1)
+        XCTAssertEqual(statusItem.visibilityObservationCount, 1)
         XCTAssertEqual(statusItem.presentations.count, initialPresentationCount + 1)
         withExtendedLifetime(controller) {}
     }
@@ -324,6 +370,8 @@ final class StatusItemControllerTests: XCTestCase {
                 for: MenuBarPresentation(
                     providerStates: [makeState(status: .available, used: value.used)],
                     persistedPinnedProviderRawValue: ProviderID.codex.rawValue,
+                    displayStyle: .single,
+                    quotaSelection: .fiveHour,
                     mode: .remaining
                 ),
                 locale: Locale(identifier: "en")
@@ -332,16 +380,18 @@ final class StatusItemControllerTests: XCTestCase {
         let disabled = MenuBarPresentation(
             providerStates: [makeState(status: .disabled, used: 39)],
             persistedPinnedProviderRawValue: ProviderID.codex.rawValue,
+            displayStyle: .single,
+            quotaSelection: .fiveHour,
             mode: .remaining
         )
 
-        XCTAssertEqual(presentations.map(\.title), ["0%", "61%", "100%"])
+        XCTAssertEqual(presentations.map(\.title), ["5H 0%", "5H 61%", "5H 100%"])
         XCTAssertEqual(
             presentations[1],
             StatusItemButtonPresentation(
-                title: "61%",
+                title: "5H 61%",
                 accessibilityLabel: "Codex",
-                accessibilityValue: "61% remaining"
+                accessibilityValue: "5-hour quota, 61% remaining"
             )
         )
         XCTAssertEqual(
@@ -350,15 +400,15 @@ final class StatusItemControllerTests: XCTestCase {
                 locale: Locale(identifier: "en")
             ),
             StatusItemButtonPresentation(
-                title: "—",
+                title: "5H —",
                 accessibilityLabel: "Codex, Disabled",
-                accessibilityValue: "Unavailable"
+                accessibilityValue: "5-hour quota, Unavailable"
             )
         )
     }
 
     func testButtonTitleHasNoManualPaddingAndSupportsAllCompactMetrics() {
-        for title in ["—", "0%", "61%", "100%"] {
+        for title in ["—", "W 0%", "5H 61%", "R 100%", "5H 100% · W 100% · R 100%"] {
             let attributedTitle = StatusItemButtonStyle.attributedTitle(title)
 
             XCTAssertEqual(attributedTitle.string, title)

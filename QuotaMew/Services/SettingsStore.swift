@@ -23,6 +23,36 @@ enum UsagePresentationMode: String, CaseIterable, Codable, Sendable {
     case used
 }
 
+enum MenuBarDisplayStyle: String, CaseIterable, Codable, Sendable {
+    case single
+    case overview
+}
+
+enum MenuBarQuotaSelection: String, CaseIterable, Codable, Sendable {
+    case fiveHour
+    case weekly
+    case lunaReserve
+
+    var compactIdentifier: String {
+        switch self {
+        case .fiveHour: "5H"
+        case .weekly: "W"
+        case .lunaReserve: "R"
+        }
+    }
+
+    func displayName(locale: Locale) -> String {
+        switch self {
+        case .fiveHour:
+            AppLocalization.string("5-hour", locale: locale)
+        case .weekly:
+            AppLocalization.string("Weekly", locale: locale)
+        case .lunaReserve:
+            AppLocalization.string("Luna Reserve", locale: locale)
+        }
+    }
+}
+
 enum OnboardingState: String, CaseIterable, Codable, Sendable {
     case neverShown
     case completed
@@ -51,6 +81,8 @@ final class SettingsStore: AppPreferencesProviding {
         static let shortWindowReminder30MinutesEnabled = "notifications.short-window.reminder.30m.enabled"
         static let usagePresentationMode = "presentation.usage.mode"
         static let pinnedProvider = "presentation.menu-bar.pinned-provider"
+        static let menuBarDisplayStyle = "presentation.menu-bar.display-style"
+        static let menuBarQuotaSelection = "presentation.menu-bar.quota-selection"
         static let onboardingState = "onboarding.state"
         static let onboardingLastCompletedVersion = "onboarding.last-completed-version"
         static let resetIntelligenceEnabled = "reset-intelligence.enabled"
@@ -70,6 +102,8 @@ final class SettingsStore: AppPreferencesProviding {
     private(set) var isShortWindow1HourReminderEnabled: Bool
     private(set) var isShortWindow30MinuteReminderEnabled: Bool
     private(set) var usagePresentationMode: UsagePresentationMode
+    private(set) var menuBarDisplayStyle: MenuBarDisplayStyle
+    private(set) var menuBarQuotaSelection: MenuBarQuotaSelection
     /// The raw value is retained so an older app does not erase a newer provider pin.
     private(set) var pinnedProviderRawValue: String?
     private(set) var onboardingState: OnboardingState
@@ -120,6 +154,16 @@ final class SettingsStore: AppPreferencesProviding {
             defaults,
             key: Key.usagePresentationMode,
             defaultValue: .remaining
+        )
+        menuBarDisplayStyle = Self.enumValue(
+            defaults,
+            key: Key.menuBarDisplayStyle,
+            defaultValue: .single
+        )
+        menuBarQuotaSelection = Self.enumValue(
+            defaults,
+            key: Key.menuBarQuotaSelection,
+            defaultValue: .weekly
         )
         pinnedProviderRawValue = defaults.string(forKey: Key.pinnedProvider)
         if hasPersistedOnboardingState {
@@ -202,6 +246,16 @@ final class SettingsStore: AppPreferencesProviding {
         defaults.set(mode.rawValue, forKey: Key.usagePresentationMode)
     }
 
+    func setMenuBarDisplayStyle(_ style: MenuBarDisplayStyle) {
+        menuBarDisplayStyle = style
+        defaults.set(style.rawValue, forKey: Key.menuBarDisplayStyle)
+    }
+
+    func setMenuBarQuotaSelection(_ selection: MenuBarQuotaSelection) {
+        menuBarQuotaSelection = selection
+        defaults.set(selection.rawValue, forKey: Key.menuBarQuotaSelection)
+    }
+
     func setPinnedProvider(_ providerID: ProviderID?) {
         pinnedProviderRawValue = providerID?.rawValue
         if let providerID { defaults.set(providerID.rawValue, forKey: Key.pinnedProvider) }
@@ -280,6 +334,8 @@ final class SettingsStore: AppPreferencesProviding {
             Key.shortWindowReminder30MinutesEnabled,
             Key.usagePresentationMode,
             Key.pinnedProvider,
+            Key.menuBarDisplayStyle,
+            Key.menuBarQuotaSelection,
             Key.onboardingLastCompletedVersion,
             Key.resetIntelligenceEnabled,
             "notification.deduplication.v1",

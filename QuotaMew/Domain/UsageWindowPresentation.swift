@@ -32,6 +32,15 @@ struct UsageWindowPresentation: Equatable, Sendable {
             && (duration == .seconds(18_000) || duration == .seconds(604_800))
     }
 
+    var menuBarQuotaSelection: MenuBarQuotaSelection? {
+        if isReserve { return .lunaReserve }
+        return switch duration {
+        case .seconds(18_000): .fiveHour
+        case .seconds(604_800): .weekly
+        default: nil
+        }
+    }
+
     func displayName(locale: Locale) -> String {
         if isReserve { return AppLocalization.string("Luna Reserve", locale: locale) }
         switch duration {

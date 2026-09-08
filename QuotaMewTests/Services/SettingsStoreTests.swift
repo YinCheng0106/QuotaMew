@@ -19,6 +19,8 @@ final class SettingsStoreTests: XCTestCase {
         first.setReminder(windowClass: .long, minutes: 6 * 60, enabled: false)
         first.setReminder(windowClass: .long, minutes: 60, enabled: false)
         first.setUsagePresentationMode(.used)
+        first.setMenuBarDisplayStyle(.overview)
+        first.setMenuBarQuotaSelection(.lunaReserve)
         first.setPinnedProvider(.claude)
         first.setOnboardingState(.completed)
         first.setResetIntelligenceEnabled(true)
@@ -32,6 +34,8 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(recreated.notificationPreferences.thresholds(for: .short), [])
         XCTAssertEqual(recreated.notificationPreferences.thresholds(for: .long), [])
         XCTAssertEqual(recreated.usagePresentationMode, .used)
+        XCTAssertEqual(recreated.menuBarDisplayStyle, .overview)
+        XCTAssertEqual(recreated.menuBarQuotaSelection, .lunaReserve)
         XCTAssertEqual(recreated.pinnedProviderID, .claude)
         XCTAssertEqual(recreated.onboardingState, .completed)
         XCTAssertEqual(recreated.onboardingLastCompletedVersion, SettingsStore.currentOnboardingVersion)
@@ -54,6 +58,8 @@ final class SettingsStoreTests: XCTestCase {
             [24 * 60, 6 * 60, 60]
         )
         XCTAssertEqual(store.usagePresentationMode, .remaining)
+        XCTAssertEqual(store.menuBarDisplayStyle, .single)
+        XCTAssertEqual(store.menuBarQuotaSelection, .weekly)
         XCTAssertNil(store.pinnedProviderID)
         XCTAssertEqual(store.onboardingState, .neverShown)
         XCTAssertEqual(store.onboardingLastCompletedVersion, 0)
@@ -209,6 +215,80 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "presentation.usage.mode"), "future-mode")
     }
 
+    func testMissingMenuBarPreferencesPreserveBetaTwoWeeklyMeaning() {
+        let (defaults, suiteName) = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(UsagePresentationMode.used.rawValue, forKey: "presentation.usage.mode")
+
+        let store = SettingsStore(defaults: defaults)
+
+        XCTAssertEqual(store.menuBarDisplayStyle, .single)
+        XCTAssertEqual(store.menuBarQuotaSelection, .weekly)
+        XCTAssertNil(defaults.object(forKey: "presentation.menu-bar.display-style"))
+        XCTAssertNil(defaults.object(forKey: "presentation.menu-bar.quota-selection"))
+        XCTAssertEqual(store.usagePresentationMode, .used)
+    }
+
+    func testSingleAndOverviewPreferencesPersistIndependently() {
+        let (defaults, suiteName) = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let first = SettingsStore(defaults: defaults)
+
+        first.setMenuBarDisplayStyle(.overview)
+        XCTAssertEqual(SettingsStore(defaults: defaults).menuBarDisplayStyle, .overview)
+
+        first.setMenuBarDisplayStyle(.single)
+        first.setMenuBarQuotaSelection(.fiveHour)
+        let recreated = SettingsStore(defaults: defaults)
+
+        XCTAssertEqual(recreated.menuBarDisplayStyle, .single)
+        XCTAssertEqual(recreated.menuBarQuotaSelection, .fiveHour)
+    }
+
+    func testEveryQuotaSelectionPersists() {
+        for selection in MenuBarQuotaSelection.allCases {
+            let (defaults, suiteName) = makeDefaults()
+            defer { defaults.removePersistentDomain(forName: suiteName) }
+            let store = SettingsStore(defaults: defaults)
+
+            store.setMenuBarQuotaSelection(selection)
+
+            XCTAssertEqual(SettingsStore(defaults: defaults).menuBarQuotaSelection, selection)
+        }
+    }
+
+    func testUnknownMenuBarValuesFallBackWithoutOverwritingStoredValues() {
+        let (defaults, suiteName) = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set("future-style", forKey: "presentation.menu-bar.display-style")
+        defaults.set("future-quota", forKey: "presentation.menu-bar.quota-selection")
+
+        let store = SettingsStore(defaults: defaults)
+
+        XCTAssertEqual(store.menuBarDisplayStyle, .single)
+        XCTAssertEqual(store.menuBarQuotaSelection, .weekly)
+        XCTAssertEqual(defaults.string(forKey: "presentation.menu-bar.display-style"), "future-style")
+        XCTAssertEqual(defaults.string(forKey: "presentation.menu-bar.quota-selection"), "future-quota")
+    }
+
+    func testChangingMenuBarPreferencesDoesNotChangeUnrelatedSettings() {
+        let (defaults, suiteName) = makeDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = SettingsStore(defaults: defaults)
+        store.setProvider(.claude, enabled: false)
+        store.setNotificationsEnabled(false)
+        store.setUsagePresentationMode(.used)
+        store.setPinnedProvider(.codex)
+
+        store.setMenuBarDisplayStyle(.overview)
+        store.setMenuBarQuotaSelection(.lunaReserve)
+
+        XCTAssertFalse(store.isClaudeEnabled)
+        XCTAssertFalse(store.areNotificationsEnabled)
+        XCTAssertEqual(store.usagePresentationMode, .used)
+        XCTAssertEqual(store.pinnedProviderID, .codex)
+    }
+
     func testDisabledOrUnavailableProviderDoesNotMutatePersistedPin() {
         let (defaults, suiteName) = makeDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -270,6 +350,8 @@ final class SettingsStoreTests: XCTestCase {
         let store = SettingsStore(defaults: defaults)
         store.setProvider(.claude, enabled: false)
         store.setUsagePresentationMode(.used)
+        store.setMenuBarDisplayStyle(.overview)
+        store.setMenuBarQuotaSelection(.lunaReserve)
         store.setPinnedProvider(.codex)
 
         store.setOnboardingState(.skipped)
@@ -277,6 +359,8 @@ final class SettingsStoreTests: XCTestCase {
 
         XCTAssertFalse(store.isClaudeEnabled)
         XCTAssertEqual(store.usagePresentationMode, .used)
+        XCTAssertEqual(store.menuBarDisplayStyle, .overview)
+        XCTAssertEqual(store.menuBarQuotaSelection, .lunaReserve)
         XCTAssertEqual(store.pinnedProviderID, .codex)
         XCTAssertEqual(store.onboardingState, .completed)
     }

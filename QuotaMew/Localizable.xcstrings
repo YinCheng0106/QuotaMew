@@ -849,6 +849,36 @@
       "comment" : "Product name; intentionally unchanged in all languages.",
       "shouldTranslate" : false
     },
+    "Menu Bar" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選單列"
+          }
+        }
+      }
+    },
+    "Menu Bar Display" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選單列顯示方式"
+          }
+        }
+      }
+    },
+    "Menu Bar Quota" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選單列配額"
+          }
+        }
+      }
+    },
     "macOS may also control visibility in System Settings." : {
       "localizations" : {
         "zh-Hant" : {
@@ -935,6 +965,40 @@
         }
       }
     },
+    "menu-bar.accessibility.metric %@ %@" : {
+      "comment" : "Semantic status-item metric for VoiceOver. The placeholders are the full quota-window name and localized Remaining or Used value.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ quota, %2$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@配額，%2$@"
+          }
+        }
+      }
+    },
+    "menu-bar.accessibility.separator" : {
+      "comment" : "Separator between semantic status-item metrics for VoiceOver.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "; "
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "；"
+          }
+        }
+      }
+    },
     "menu-bar.accessibility.unavailable %@" : {
       "comment" : "Status item accessibility label for an unavailable provider. The placeholder is the provider product name.",
       "localizations" : {
@@ -948,6 +1012,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@，無法使用"
+          }
+        }
+      }
+    },
+    "Overview" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "總覽"
+          }
+        }
+      }
+    },
+    "Overview shows 5-hour and Weekly quota together. Luna Reserve appears only when regular quota is exhausted." : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "總覽會同時顯示 5 小時與每週配額。只有一般配額用盡時，才會顯示 Luna Reserve。"
+          }
+        }
+      }
+    },
+    "Quota" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配額"
+          }
+        }
+      }
+    },
+    "Single" : {
+      "localizations" : {
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "單一"
           }
         }
       }

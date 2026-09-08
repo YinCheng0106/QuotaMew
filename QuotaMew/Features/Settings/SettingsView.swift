@@ -36,10 +36,6 @@ private struct GeneralSettingsPage: View {
     var body: some View {
         Form {
             Section("General") {
-                Toggle("Show Menu Bar Item", isOn: menuBarVisibilityBinding)
-                Text("macOS may also control visibility in System Settings.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 Toggle("Launch at Login", isOn: launchAtLoginBinding)
                     .disabled(model.isUpdatingLaunchAtLogin || model.launchAtLoginStatus == .requiresApproval)
                 launchAtLoginStatus
@@ -56,6 +52,13 @@ private struct GeneralSettingsPage: View {
                 }
                 .pickerStyle(.segmented)
                 .accessibilityLabel("Usage display")
+            }
+
+            Section("Menu Bar") {
+                Toggle("Show Menu Bar Item", isOn: menuBarVisibilityBinding)
+                Text("macOS may also control visibility in System Settings.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 Picker("Menu Bar Provider", selection: pinnedProviderBinding) {
                     Text("Automatic").tag(ProviderID?.none)
@@ -81,6 +84,30 @@ private struct GeneralSettingsPage: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Picker("Display", selection: menuBarDisplayStyleBinding) {
+                    Text("Single").tag(MenuBarDisplayStyle.single)
+                    Text("Overview").tag(MenuBarDisplayStyle.overview)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityLabel("Menu Bar Display")
+
+                if model.menuBarDisplayStyle == .single {
+                    Picker("Quota", selection: menuBarQuotaSelectionBinding) {
+                        Text("5-hour").tag(MenuBarQuotaSelection.fiveHour)
+                        Text("Weekly").tag(MenuBarQuotaSelection.weekly)
+                        Text("Luna Reserve").tag(MenuBarQuotaSelection.lunaReserve)
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityLabel("Menu Bar Quota")
+                } else {
+                    Text(
+                        "Overview shows 5-hour and Weekly quota together. Luna Reserve appears only when regular quota is exhausted."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -119,6 +146,20 @@ private struct GeneralSettingsPage: View {
 
     private var pinnedProviderBinding: Binding<ProviderID?> {
         Binding(get: { model.pinnedProviderID }, set: { model.setPinnedProvider($0) })
+    }
+
+    private var menuBarDisplayStyleBinding: Binding<MenuBarDisplayStyle> {
+        Binding(
+            get: { model.menuBarDisplayStyle },
+            set: { model.setMenuBarDisplayStyle($0) }
+        )
+    }
+
+    private var menuBarQuotaSelectionBinding: Binding<MenuBarQuotaSelection> {
+        Binding(
+            get: { model.menuBarQuotaSelection },
+            set: { model.setMenuBarQuotaSelection($0) }
+        )
     }
 
     @ViewBuilder

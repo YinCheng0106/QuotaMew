@@ -149,14 +149,15 @@ final class StatusItemController: StatusItemControllerLifecycle {
         for presentation: MenuBarPresentation,
         locale: Locale
     ) -> StatusItemButtonPresentation {
-        let title = presentation.usage?.compactText(locale: locale) ?? "—"
+        let title = presentation.compactText(locale: locale) ?? "—"
         let providerName = presentation.selectedProvider?.displayName ?? "QuotaMew"
 
-        if let usage = presentation.usage?.text(locale: locale) {
+        if presentation.availability == .renderable,
+           let accessibilityValue = presentation.accessibilityValue(locale: locale) {
             return StatusItemButtonPresentation(
                 title: title,
                 accessibilityLabel: providerName,
-                accessibilityValue: usage
+                accessibilityValue: accessibilityValue
             )
         }
 
@@ -165,22 +166,22 @@ final class StatusItemController: StatusItemControllerLifecycle {
         switch presentation.availability {
         case .renderable:
             accessibilityLabel = providerName
-            accessibilityValue = AppLocalization.string(
-                "Menu bar usage unavailable",
-                locale: locale
-            )
+            accessibilityValue = presentation.accessibilityValue(locale: locale)
+                ?? AppLocalization.string("Menu bar usage unavailable", locale: locale)
         case .disabled:
             accessibilityLabel = AppLocalization.menuBarDisabledLabel(
                 providerName: providerName,
                 locale: locale
             )
-            accessibilityValue = AppLocalization.string("Unavailable", locale: locale)
+            accessibilityValue = presentation.accessibilityValue(locale: locale)
+                ?? AppLocalization.string("Unavailable", locale: locale)
         case .unavailable:
             accessibilityLabel = AppLocalization.menuBarUnavailableLabel(
                 providerName: providerName,
                 locale: locale
             )
-            accessibilityValue = AppLocalization.string("Unavailable", locale: locale)
+            accessibilityValue = presentation.accessibilityValue(locale: locale)
+                ?? AppLocalization.string("Unavailable", locale: locale)
         case .empty:
             accessibilityLabel = AppLocalization.string(
                 "QuotaMew, No providers enabled",

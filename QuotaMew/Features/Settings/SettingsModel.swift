@@ -21,6 +21,8 @@ final class SettingsModel {
 
     private(set) var isMenuBarItemVisible = false
     private(set) var usagePresentationMode: UsagePresentationMode
+    private(set) var menuBarDisplayStyle: MenuBarDisplayStyle
+    private(set) var menuBarQuotaSelection: MenuBarQuotaSelection
     /// Retains unknown future provider values while this app version is running.
     private(set) var pinnedProviderRawValue: String?
     private(set) var launchAtLoginStatus: LaunchAtLoginStatus = .disabled
@@ -44,6 +46,8 @@ final class SettingsModel {
     ) {
         self.store = store
         usagePresentationMode = store.usagePresentationMode
+        menuBarDisplayStyle = store.menuBarDisplayStyle
+        menuBarQuotaSelection = store.menuBarQuotaSelection
         pinnedProviderRawValue = store.pinnedProviderRawValue
         self.appModel = appModel
         self.notificationService = notificationService
@@ -98,6 +102,18 @@ final class SettingsModel {
         usagePresentationMode = mode
     }
 
+    func setMenuBarDisplayStyle(_ style: MenuBarDisplayStyle) {
+        guard menuBarDisplayStyle != style else { return }
+        store.setMenuBarDisplayStyle(style)
+        menuBarDisplayStyle = style
+    }
+
+    func setMenuBarQuotaSelection(_ selection: MenuBarQuotaSelection) {
+        guard menuBarQuotaSelection != selection else { return }
+        store.setMenuBarQuotaSelection(selection)
+        menuBarQuotaSelection = selection
+    }
+
     func setPinnedProvider(_ providerID: ProviderID?) {
         store.setPinnedProvider(providerID)
         pinnedProviderRawValue = providerID?.rawValue
@@ -111,6 +127,8 @@ final class SettingsModel {
         MenuBarPresentation(
             providerStates: appModel.providerStates,
             persistedPinnedProviderRawValue: pinnedProviderRawValue,
+            displayStyle: menuBarDisplayStyle,
+            quotaSelection: menuBarQuotaSelection,
             mode: usagePresentationMode
         )
     }

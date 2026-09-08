@@ -70,8 +70,8 @@ final class UsageWindowPresentationTests: XCTestCase {
         XCTAssertEqual(projection.regularWindows, [regular])
         XCTAssertEqual(projection.reserveWindows, [reserve])
         XCTAssertFalse(projection.showsReserveProminently)
-        XCTAssertEqual(menu(value).usage?.percentage, 61)
-        XCTAssertNil(menu(state([reserve])).usage)
+        XCTAssertEqual(menu(value).metrics.first?.usage?.percentage, 61)
+        XCTAssertNil(menu(state([reserve])).metrics.first?.usage)
     }
 
     func testEitherRegularWindowCanSurfaceReserveWithoutReplacingRegularIdentity() {
@@ -83,7 +83,10 @@ final class UsageWindowPresentationTests: XCTestCase {
             XCTAssertTrue(projection.showsReserveProminently)
             XCTAssertEqual(projection.regularWindows, [regular])
             XCTAssertEqual(projection.reserveWindows, [reserve])
-            XCTAssertEqual(menu(value).usage?.percentage, 0)
+            let selection: MenuBarQuotaSelection = duration == .seconds(18_000)
+                ? .fiveHour
+                : .weekly
+            XCTAssertEqual(menu(value, selection: selection).metrics.first?.usage?.percentage, 0)
         }
     }
 
@@ -148,7 +151,17 @@ final class UsageWindowPresentationTests: XCTestCase {
         ))
     }
 
-    private func menu(_ state: ProviderState) -> MenuBarPresentation {
-        MenuBarPresentation(providerStates: [state], persistedPinnedProviderRawValue: "codex", mode: .remaining)
+    private func menu(
+        _ state: ProviderState,
+        selection: MenuBarQuotaSelection = .fiveHour
+    ) -> MenuBarPresentation {
+        MenuBarPresentation(
+            providerStates: [state],
+            persistedPinnedProviderRawValue: "codex",
+            displayStyle: .single,
+            quotaSelection: selection,
+            mode: .remaining,
+            now: now
+        )
     }
 }

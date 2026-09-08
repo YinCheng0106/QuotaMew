@@ -179,7 +179,19 @@ final class SettingsIntegrationTests: XCTestCase {
 
         XCTAssertEqual(store.pinnedProviderRawValue, ProviderID.codex.rawValue)
         XCTAssertEqual(settingsModel.menuBarPresentation.currentlyRenderedProvider, .codex)
-        XCTAssertEqual(settingsModel.menuBarPresentation.usage?.percentage, 61)
+        XCTAssertEqual(settingsModel.menuBarPresentation.compactText(locale: Locale(identifier: "en")), "W 61%")
+
+        settingsModel.setMenuBarDisplayStyle(.overview)
+        settingsModel.setMenuBarQuotaSelection(.fiveHour)
+
+        XCTAssertEqual(store.menuBarDisplayStyle, .overview)
+        XCTAssertEqual(store.menuBarQuotaSelection, .fiveHour)
+        XCTAssertEqual(
+            settingsModel.menuBarPresentation.compactText(locale: Locale(identifier: "en")),
+            "5H 61% · W 61%"
+        )
+
+        settingsModel.setMenuBarDisplayStyle(.single)
 
         settingsModel.setUsagePresentationMode(.used)
 
@@ -187,7 +199,7 @@ final class SettingsIntegrationTests: XCTestCase {
         let codexFetchCount = await codex.fetchCount
         XCTAssertEqual(store.usagePresentationMode, .used)
         XCTAssertEqual(settingsModel.menuBarPresentation.currentlyRenderedProvider, .codex)
-        XCTAssertEqual(settingsModel.menuBarPresentation.usage?.percentage, 39)
+        XCTAssertEqual(settingsModel.menuBarPresentation.compactText(locale: Locale(identifier: "en")), "5H 39%")
         XCTAssertEqual(claudeFetchCount, 1)
         XCTAssertEqual(codexFetchCount, 1)
         // NotificationService.evaluate runs reset detection, while provider enablement
@@ -241,7 +253,7 @@ final class SettingsIntegrationTests: XCTestCase {
         XCTAssertEqual(store.pinnedProviderRawValue, ProviderID.claude.rawValue)
         XCTAssertEqual(settingsModel.menuBarPresentation.currentlyRenderedProvider, .claude)
         XCTAssertEqual(settingsModel.menuBarPresentation.availability, .renderable)
-        XCTAssertEqual(settingsModel.menuBarPresentation.usage?.percentage, 76)
+        XCTAssertEqual(settingsModel.menuBarPresentation.metrics.first?.usage?.percentage, 76)
     }
 
     func testAllProvidersDisabledHasExplicitSafeMenuBarState() {
@@ -272,7 +284,7 @@ final class SettingsIntegrationTests: XCTestCase {
         XCTAssertEqual(settingsModel.menuBarPresentation.availability, .empty)
     }
 
-    func testMenuBarPresentationObservationInvalidatesForPinAndUsageModeChanges() {
+    func testMenuBarPresentationObservationInvalidatesForEveryPresentationPreference() {
         let (store, defaults, suiteName) = makeStore()
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let model = SettingsModel(
@@ -302,6 +314,28 @@ final class SettingsIntegrationTests: XCTestCase {
         model.setUsagePresentationMode(.used)
 
         XCTAssertEqual(XCTWaiter.wait(for: [modeInvalidated], timeout: 0), .completed)
+
+        let styleInvalidated = expectation(description: "Menu bar display style invalidated")
+        withObservationTracking {
+            _ = model.menuBarPresentation
+        } onChange: {
+            styleInvalidated.fulfill()
+        }
+
+        model.setMenuBarDisplayStyle(.overview)
+
+        XCTAssertEqual(XCTWaiter.wait(for: [styleInvalidated], timeout: 0), .completed)
+
+        let quotaInvalidated = expectation(description: "Menu bar quota selection invalidated")
+        withObservationTracking {
+            _ = model.menuBarPresentation
+        } onChange: {
+            quotaInvalidated.fulfill()
+        }
+
+        model.setMenuBarQuotaSelection(.fiveHour)
+
+        XCTAssertEqual(XCTWaiter.wait(for: [quotaInvalidated], timeout: 0), .completed)
     }
 
     func testLaunchAtLoginUsesControllerStateAfterSuccessAndFailure() async {
@@ -375,6 +409,8 @@ final class SettingsIntegrationTests: XCTestCase {
             launchAtLoginController: SettingsLaunchAtLoginController(status: .disabled)
         )
         model.setUsagePresentationMode(.used)
+        model.setMenuBarDisplayStyle(.overview)
+        model.setMenuBarQuotaSelection(.lunaReserve)
         model.setPinnedProvider(.claude)
 
         model.skipOnboarding()
@@ -382,6 +418,8 @@ final class SettingsIntegrationTests: XCTestCase {
 
         XCTAssertEqual(store.onboardingState, .completed)
         XCTAssertEqual(store.usagePresentationMode, .used)
+        XCTAssertEqual(store.menuBarDisplayStyle, .overview)
+        XCTAssertEqual(store.menuBarQuotaSelection, .lunaReserve)
         XCTAssertEqual(store.pinnedProviderID, .claude)
         XCTAssertEqual(notifications.authorizationRequestCount, 0)
         XCTAssertEqual(notifications.preferencesChangeCount, 0)
@@ -465,7 +503,7 @@ final class SettingsIntegrationTests: XCTestCase {
         XCTAssertFalse(model.isMenuBarItemVisible)
         XCTAssertEqual(appModel.activeProviderStates.map(\.providerID), [.codex])
         XCTAssertEqual(model.menuBarPresentation.currentlyRenderedProvider, .codex)
-        XCTAssertEqual(model.menuBarPresentation.usage?.percentage, 61)
+        XCTAssertEqual(model.menuBarPresentation.metrics.first?.usage?.percentage, 61)
         XCTAssertEqual(fetchCount, 1)
         XCTAssertEqual(notifications.evaluationCount, baselineNotificationEvaluations)
     }
@@ -591,11 +629,18 @@ private actor SettingsCountingProvider: UsageProvider {
             windows: usedPercentage.map {
                 [
                     UsageWindow(
-                        id: "primary",
-                        label: "Primary window",
+                        id: "five-hour",
+                        label: "5-hour window",
                         usedPercentage: $0,
                         resetAt: Date(timeIntervalSince1970: 2_000_003_600),
                         duration: .seconds(18_000)
+                    ),
+                    UsageWindow(
+                        id: "weekly",
+                        label: "Weekly window",
+                        usedPercentage: $0,
+                        resetAt: Date(timeIntervalSince1970: 2_000_003_600),
+                        duration: .seconds(604_800)
                     ),
                 ]
             } ?? [],

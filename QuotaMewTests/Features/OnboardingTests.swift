@@ -136,6 +136,8 @@ final class OnboardingTests: XCTestCase {
             let fixture = makeFixture(notifications: notifications)
             defer { fixture.cleanup() }
             fixture.settingsModel.setUsagePresentationMode(.used)
+            fixture.settingsModel.setMenuBarDisplayStyle(.overview)
+            fixture.settingsModel.setMenuBarQuotaSelection(.lunaReserve)
             fixture.settingsModel.setPinnedProvider(.claude)
             let presenter = TestOnboardingPresenter()
             let delegate = makeDelegate(
@@ -149,6 +151,8 @@ final class OnboardingTests: XCTestCase {
 
             XCTAssertEqual(fixture.store.onboardingState, .skipped)
             XCTAssertEqual(fixture.store.usagePresentationMode, .used)
+            XCTAssertEqual(fixture.store.menuBarDisplayStyle, .overview)
+            XCTAssertEqual(fixture.store.menuBarQuotaSelection, .lunaReserve)
             XCTAssertEqual(fixture.store.pinnedProviderID, .claude)
             XCTAssertTrue(fixture.store.isMenuBarItemRequested)
             XCTAssertEqual(notifications.authorizationRequestCount, 0)
@@ -159,6 +163,8 @@ final class OnboardingTests: XCTestCase {
         let fixture = makeFixture(onboardingState: .completed)
         defer { fixture.cleanup() }
         fixture.settingsModel.setUsagePresentationMode(.used)
+        fixture.settingsModel.setMenuBarDisplayStyle(.overview)
+        fixture.settingsModel.setMenuBarQuotaSelection(.fiveHour)
         fixture.settingsModel.setPinnedProvider(.codex)
         let originalVersion = fixture.store.onboardingLastCompletedVersion
         let presenter = TestOnboardingPresenter()
@@ -181,6 +187,8 @@ final class OnboardingTests: XCTestCase {
         XCTAssertEqual(fixture.store.onboardingState, .completed)
         XCTAssertEqual(fixture.store.onboardingLastCompletedVersion, originalVersion)
         XCTAssertEqual(fixture.store.usagePresentationMode, .used)
+        XCTAssertEqual(fixture.store.menuBarDisplayStyle, .overview)
+        XCTAssertEqual(fixture.store.menuBarQuotaSelection, .fiveHour)
         XCTAssertEqual(fixture.store.pinnedProviderID, .codex)
     }
 
