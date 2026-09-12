@@ -2,7 +2,7 @@
 
 本路線圖以成果為導向。在平臺基準與即時 provider 整合驗證完成前，刻意不承諾日期。
 
-目前公開版為 **QuotaMew v0.2.0-beta.3**。以下歷史 milestone／strategy records 保留原決策；目前 scope 以本文最後的 **2026-09-07 v0.2 規劃決策**及 [V0_2_PLAN.md](docs/V0_2_PLAN.md) 為準。
+目前公開版為 **QuotaMew v0.2.0-rc.1**。以下歷史 milestone／strategy records 保留原決策；目前 scope 以本文最後的 **2026-09-07 v0.2 規劃決策**及 [V0_2_PLAN.md](docs/V0_2_PLAN.md) 為準。
 
 ## Milestone 0 — 規劃基準
 

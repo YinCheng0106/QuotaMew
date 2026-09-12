@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-rc.1] - 2026-09-12
+
+QuotaMew v0.2.0 feature development is complete. This first release candidate carries the Beta 3 product experience into final release validation and stability work.
+
+### Changed
+
+- Freeze the v0.2.0 feature scope for release-candidate stabilization.
+- Carry forward the native menu bar experience, Codex quota presentation, onboarding, Settings, notifications, accessibility/localization improvements, and recovery lifecycle improvements from Beta 3.
+- Complete deterministic XCTest, live Codex, and live system notification validation for the candidate baseline.
+
+### Distribution
+
+- The RC.1 DMG is Apple Development signed and is not Developer ID signed or notarized.
+- macOS may require **System Settings → Privacy & Security → Open Anyway** on first launch.
+- Claude Code remains **Experimental / Unverified**; Reset Intelligence remains deferred to v0.3.
+
 ## [0.2.0-beta.3] - 2026-09-08
 
 ### Added

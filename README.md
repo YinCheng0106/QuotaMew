@@ -51,11 +51,11 @@ ChatGPT.app support relies on an undocumented packaging detail: the bundled Code
 
 ## Installation
 
-### Download the beta
+### Download the release candidate
 
-The current public release is **QuotaMew v0.2.0 Beta 3**. Beta 1 was released under the previous QuotaPulse name; its historical release records and artifacts retain that name.
+The current public release candidate is **QuotaMew v0.2.0 RC.1**. Beta 1 was released under the previous QuotaPulse name; its historical release records and artifacts retain that name.
 
-Download the [QuotaMew v0.2.0-beta.3 release](https://github.com/YinCheng0106/QuotaMew/releases/tag/v0.2.0-beta.3), then choose `QuotaMew-v0.2.0-beta.3.dmg`.
+Download the [QuotaMew v0.2.0-rc.1 release](https://github.com/YinCheng0106/QuotaMew/releases/tag/v0.2.0-rc.1), then choose `QuotaMew-v0.2.0-rc.1.dmg`.
 
 1. Download the latest `.dmg`.
 2. Open the disk image.
@@ -70,7 +70,7 @@ On first launch, QuotaMew explains provider status, local privacy, display prefe
   <img src="docs/images/quotamew-onboarding.png" width="440" alt="QuotaMew onboarding showing provider status, privacy information, display preferences, and Launch at Login" />
 </p>
 
-> The current beta is not signed or notarized with an Apple Developer ID. macOS may require additional approval on first launch.
+> The current RC is Apple Development signed, not signed or notarized with an Apple Developer ID. macOS may require additional approval on first launch through **System Settings → Privacy & Security → Open Anyway**.
 
 ### Build from source
 
@@ -148,7 +148,7 @@ Do not attach raw app-server output, Codex session files, authentication files, 
 - Validated on Apple silicon; Intel Macs are not yet validated
 - ChatGPT.app Codex runtime discovery depends on an undocumented bundle path
 - Claude Code support is Experimental / Unverified
-- The current beta DMG has no Developer ID signing or Apple notarization
+- The current RC DMG has no Developer ID signing or Apple notarization
 - No usage history or cloud sync
 - No iPhone app
 - Official external Reset Intelligence feed ingestion is not implemented
@@ -165,7 +165,7 @@ The Beta 3 release uses shared **5-hour / Weekly** window names in Dashboard, Vo
 
 Left-click toggles Dashboard. Right-click opens a native menu with **Refresh Now**, **Settings…**, and **Quit QuotaMew**, using the existing refresh, Settings scene, and normal termination paths.
 
-Milestones A and B, Product Polish, and **Milestone C — Onboarding** are complete in Beta 3. Next: release hardening → RC 1 → v0.2.0. External Reset Intelligence feed/network/matching work is planned for v0.3. See [the v0.2 plan](docs/V0_2_PLAN.md) and [manual acceptance checklist](docs/RUNTIME_TESTING.md#v02-product-polish-acceptance).
+Milestones A and B, Product Polish, and **Milestone C — Onboarding** are complete. RC.1 freezes the v0.2.0 feature scope and focuses on final release validation and stability. External Reset Intelligence feed/network/matching work is planned for v0.3. See [the v0.2 plan](docs/V0_2_PLAN.md) and [manual acceptance checklist](docs/RUNTIME_TESTING.md#v02-product-polish-acceptance).
 
 QuotaMew now includes local reset-cycle detection. Future work may include a reviewed Claude Code opt-in bridge, broader provider and hardware validation, signed/notarized distribution, and source-linked official Reset Intelligence feed ingestion. These future items are not implemented claims. See [ROADMAP.md](ROADMAP.md).
 
