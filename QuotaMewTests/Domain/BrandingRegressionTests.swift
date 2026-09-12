@@ -29,7 +29,7 @@ final class BrandingRegressionTests: XCTestCase {
             let content = try String(contentsOf: repository.appending(path: path), encoding: .utf8)
             XCTAssertTrue(content.contains("https://github.com/YinCheng0106/QuotaMew/releases"))
             XCTAssertFalse(content.contains("https://github.com/YinCheng0106/QuotaPulse/releases"))
-            XCTAssertTrue(content.contains("v0.2.0 Beta 3"))
+            XCTAssertTrue(content.contains("v0.2.0 RC.1"))
         }
         let changelog = try String(contentsOf: repository.appending(path: "CHANGELOG.md"), encoding: .utf8)
         let betaOne = try XCTUnwrap(changelog.components(separatedBy: "## [0.2.0-beta.1]").last)
