@@ -5,7 +5,7 @@
 QuotaMew is a lightweight native macOS menu bar utility for monitoring AI coding-agent quota usage and reset times.
 
 <p align="center">
-  <img src="docs/images/quotamew-dashboard.png" width="520" alt="QuotaMew macOS menu bar dashboard showing Codex 5-hour, Weekly, and Luna Reserve quota" />
+  <img src="docs/images/quotamew-dashboard.png" width="460" alt="QuotaMew macOS menu bar dashboard showing Codex 5-hour, Weekly, and Luna Reserve quota" />
 </p>
 
 QuotaMew shows 5-hour and Weekly quota directly in the macOS menu bar, with full details available from the dashboard.
@@ -37,7 +37,7 @@ Coding-agent limits often reset on different schedules. QuotaMew keeps the curre
 The General settings screen brings the key presentation choices together: Remaining or Used values, the pinned menu bar provider, and Single or Overview display mode.
 
 <p align="center">
-  <img src="docs/images/quotamew-settings.png" width="560" alt="QuotaMew settings showing Remaining and Used presentation plus Single and Overview menu bar modes" />
+  <img src="docs/images/quotamew-settings.png" width="420" alt="QuotaMew settings showing Remaining and Used presentation plus Single and Overview menu bar modes" />
 </p>
 
 ## Supported providers
@@ -67,7 +67,7 @@ For detailed installation and first-launch instructions, see the [QuotaMew docum
 On first launch, QuotaMew explains provider status, local privacy, display preferences, and Launch at Login before you start using the menu bar app.
 
 <p align="center">
-  <img src="docs/images/quotamew-onboarding.png" width="580" alt="QuotaMew onboarding showing provider status, privacy information, display preferences, and Launch at Login" />
+  <img src="docs/images/quotamew-onboarding.png" width="440" alt="QuotaMew onboarding showing provider status, privacy information, display preferences, and Launch at Login" />
 </p>
 
 > The current beta is not signed or notarized with an Apple Developer ID. macOS may require additional approval on first launch.

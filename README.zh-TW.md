@@ -5,7 +5,7 @@
 QuotaMew 是一款輕量、原生的 macOS 選單列工具，用來監看 AI 程式開發代理工具的額度用量與重設時間。
 
 <p align="center">
-  <img src="docs/images/quotamew-dashboard.png" width="520" alt="QuotaMew macOS 選單列 Dashboard，顯示 Codex 五小時、每週與 Luna Reserve 額度" />
+  <img src="docs/images/quotamew-dashboard.png" width="460" alt="QuotaMew macOS 選單列 Dashboard，顯示 Codex 五小時、每週與 Luna Reserve 額度" />
 </p>
 
 QuotaMew 可直接在 macOS 選單列顯示 5 小時與每週配額，點開即可查看完整資訊。
@@ -37,7 +37,7 @@ QuotaMew 可直接在 macOS 選單列顯示 5 小時與每週配額，點開即�
 「一般」設定集中呈現主要偏好：剩餘／已使用、固定在選單列的 Provider，以及 Single／Overview 顯示模式。
 
 <p align="center">
-  <img src="docs/images/quotamew-settings.png" width="560" alt="QuotaMew 設定畫面，顯示剩餘／已使用呈現方式與 Single／Overview 選單列模式" />
+  <img src="docs/images/quotamew-settings.png" width="420" alt="QuotaMew 設定畫面，顯示剩餘／已使用呈現方式與 Single／Overview 選單列模式" />
 </p>
 
 ## 支援的 providers
@@ -67,7 +67,7 @@ ChatGPT.app 支援依賴未文件化的封裝細節：內附 Codex runtime 的�
 首次啟動時，QuotaMew 會先介紹 Provider 狀態、本機隱私、顯示偏好與登入時啟動，再開始使用選單列 App。
 
 <p align="center">
-  <img src="docs/images/quotamew-onboarding.png" width="580" alt="QuotaMew Onboarding 顯示 Provider 狀態、隱私資訊、顯示偏好與登入時啟動" />
+  <img src="docs/images/quotamew-onboarding.png" width="440" alt="QuotaMew Onboarding 顯示 Provider 狀態、隱私資訊、顯示偏好與登入時啟動" />
 </p>
 
 > 目前的 Beta 尚未使用 Apple Developer ID 完成簽署與公證，因此第一次開啟時 macOS 可能會要求額外核准。
