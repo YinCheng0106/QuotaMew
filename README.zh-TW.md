@@ -22,6 +22,8 @@ QuotaMew 是一款輕量、原生的 macOS 選單列工具，用來監看 AI 程
 
 - 使用 Swift 與 SwiftUI 開發的原生 macOS 選單列 App
 - Dashboard 與選單列可切換顯示剩餘／已使用額度
+- 可設定選單列 Single／Overview 模式，以及 5H／W／R 精簡標籤
+- 5 小時、每週與保守呈現的 Luna Reserve 額度
 - 重設時間與分鐘級倒數
 - 透過 macOS 通知提供本機重設提醒
 - 精簡的「一般／服務提供者／通知」設定，可控制登入時啟動、選單列固定 provider、provider 啟用狀態與提醒門檻
@@ -45,7 +47,7 @@ ChatGPT.app 支援依賴未文件化的封裝細節：內附 Codex runtime 的�
 
 目前公開版本為 **QuotaMew v0.2.0 Beta 3**。Beta 1 以先前的 QuotaPulse 名稱發行，其歷史發行紀錄與產物保留原名。
 
-請從 [GitHub Releases](https://github.com/YinCheng0106/QuotaMew/releases) 下載最新的 DMG。
+請從 [QuotaMew v0.2.0-beta.3 Release](https://github.com/YinCheng0106/QuotaMew/releases/tag/v0.2.0-beta.3) 下載 `QuotaMew-v0.2.0-beta.3.dmg`。
 
 1. 下載最新的 `.dmg`。
 2. 開啟磁碟映像檔。
@@ -136,6 +138,12 @@ QuotaMew 優先採用事件驅動更新、保守的刷新週期、有上限的 p
 - 沒有用量歷史與雲端同步
 - 沒有 iPhone App
 - 尚未實作官方外部 Reset Intelligence feed 擷取
+
+## Beta 3 選單列呈現
+
+選單列可以在 Single 模式顯示一個指定額度，也可以在 Overview 模式同時顯示兩個一般額度視窗。`5H` 代表 5 小時額度，`W` 代表每週額度，`R` 代表 Luna Reserve。例如「剩餘」可能顯示為 `5H 86% · W 71%`；「已使用」則可能顯示為 `5H 14% · W 29%`。這些是呈現模式，不會改變 Provider 的額度資料。
+
+Luna Reserve 是從 Codex 資料觀察到的額外額度 bucket，由 QuotaMew 以保守方式呈現。你可以在 Single 模式明確選擇它；Overview 只有在既有的顯示規則允許時才會顯示。QuotaMew 不會控制或啟用 Reserve，也不保證請求目前正經由 Reserve 路由。
 
 ## 路線圖
 

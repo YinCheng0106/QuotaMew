@@ -22,6 +22,8 @@ Coding-agent limits often reset on different schedules. QuotaMew keeps the curre
 
 - Native Swift and SwiftUI macOS menu bar app
 - Configurable Remaining / Used quota presentation in Dashboard and menu bar
+- Configurable Menu Bar Single and Overview modes with compact 5H / W / R labels
+- 5-hour, Weekly, and conservative Luna Reserve presentation
 - Reset times and minute-level countdowns
 - Local reset reminders through macOS notifications
 - Compact General / Providers / Notifications settings, including pinned menu bar provider
@@ -45,7 +47,7 @@ ChatGPT.app support relies on an undocumented packaging detail: the bundled Code
 
 The current public release is **QuotaMew v0.2.0 Beta 3**. Beta 1 was released under the previous QuotaPulse name; its historical release records and artifacts retain that name.
 
-Download the latest DMG from the [GitHub Releases](https://github.com/YinCheng0106/QuotaMew/releases) page.
+Download the [QuotaMew v0.2.0-beta.3 release](https://github.com/YinCheng0106/QuotaMew/releases/tag/v0.2.0-beta.3), then choose `QuotaMew-v0.2.0-beta.3.dmg`.
 
 1. Download the latest `.dmg`.
 2. Open the disk image.
@@ -136,6 +138,12 @@ Do not attach raw app-server output, Codex session files, authentication files, 
 - No usage history or cloud sync
 - No iPhone app
 - Official external Reset Intelligence feed ingestion is not implemented
+
+## Beta 3 menu bar presentation
+
+The menu bar can show one selected quota in Single mode or both regular windows in Overview mode. `5H` means the 5-hour quota, `W` means Weekly, and `R` means Luna Reserve. For example, Remaining may appear as `5H 86% · W 71%`; Used presents the complementary values, such as `5H 14% · W 29%`. These are presentation modes and do not change provider quota data.
+
+Luna Reserve is an additional quota bucket observed from Codex data and presented conservatively. You can explicitly choose it in Single mode; Overview shows it only when the existing prominence rule allows it. QuotaMew does not control, activate, or guarantee Reserve routing.
 
 ## Roadmap
 
