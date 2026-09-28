@@ -53,9 +53,9 @@ ChatGPT.app support relies on an undocumented packaging detail: the bundled Code
 
 ### Download the release candidate
 
-The current public release candidate is **QuotaMew v0.2.0 RC.1**. Beta 1 was released under the previous QuotaPulse name; its historical release records and artifacts retain that name.
+The current public release candidate is **QuotaMew v0.2.0 RC.2**. It restores Codex quota detection on recent ChatGPT Desktop releases after a change to the bundled Codex CLI layout, while retaining support for the previous bundled runtime and supported legacy/standalone CLI fallbacks. Beta 1 was released under the previous QuotaPulse name; its historical release records and artifacts retain that name.
 
-Download the [QuotaMew v0.2.0-rc.1 release](https://github.com/YinCheng0106/QuotaMew/releases/tag/v0.2.0-rc.1), then choose `QuotaMew-v0.2.0-rc.1.dmg`.
+Download the [QuotaMew v0.2.0-rc.2 release](https://github.com/YinCheng0106/QuotaMew/releases/tag/v0.2.0-rc.2), then choose `QuotaMew-v0.2.0-rc.2.dmg`.
 
 1. Download the latest `.dmg`.
 2. Open the disk image.
@@ -165,7 +165,7 @@ The Beta 3 release uses shared **5-hour / Weekly** window names in Dashboard, Vo
 
 Left-click toggles Dashboard. Right-click opens a native menu with **Refresh Now**, **Settings…**, and **Quit QuotaMew**, using the existing refresh, Settings scene, and normal termination paths.
 
-Milestones A and B, Product Polish, and **Milestone C — Onboarding** are complete. RC.1 freezes the v0.2.0 feature scope and focuses on final release validation and stability. External Reset Intelligence feed/network/matching work is planned for v0.3. See [the v0.2 plan](docs/V0_2_PLAN.md) and [manual acceptance checklist](docs/RUNTIME_TESTING.md#v02-product-polish-acceptance).
+Milestones A and B, Product Polish, and **Milestone C — Onboarding** are complete. RC.2 keeps the v0.2.0 feature scope frozen and focuses on the ChatGPT Desktop Codex runtime compatibility repair plus release validation. External Reset Intelligence feed/network/matching work is planned for v0.3. See [the v0.2 plan](docs/V0_2_PLAN.md) and [manual acceptance checklist](docs/RUNTIME_TESTING.md#v02-product-polish-acceptance).
 
 QuotaMew now includes local reset-cycle detection. Future work may include a reviewed Claude Code opt-in bridge, broader provider and hardware validation, signed/notarized distribution, and source-linked official Reset Intelligence feed ingestion. These future items are not implemented claims. See [ROADMAP.md](ROADMAP.md).
 

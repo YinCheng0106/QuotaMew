@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0-rc.2] - 2026-09-28
+
+QuotaMew v0.2.0 RC.2 is a focused compatibility release candidate.
+
+### Fixed
+
+- Restore Codex quota detection on recent ChatGPT Desktop releases that package the bundled Codex CLI in a new runtime layout.
+- Preserve compatibility with the previous bundled runtime, legacy Codex.app installations, and supported standalone CLI fallbacks.
+- Keep the existing Codex app-server `account/rateLimits/read` quota protocol unchanged.
+
+### Distribution
+
+- The RC.2 DMG is Apple Development signed and is not Developer ID signed or notarized.
+- macOS may require **System Settings → Privacy & Security → Open Anyway** on first launch.
+- Claude Code remains **Experimental / Unverified**; Reset Intelligence remains deferred to v0.3.
+
 ## [0.2.0-rc.1] - 2026-09-12
 
 QuotaMew v0.2.0 feature development is complete. This first release candidate carries the Beta 3 product experience into final release validation and stability work.

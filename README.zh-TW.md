@@ -53,9 +53,9 @@ ChatGPT.app 支援依賴未文件化的封裝細節：內附 Codex runtime 的�
 
 ### 下載 Release Candidate
 
-目前公開的 release candidate 為 **QuotaMew v0.2.0 RC.1**。Beta 1 以先前的 QuotaPulse 名稱發行，其歷史發行紀錄與產物保留原名。
+目前公開的 release candidate 為 **QuotaMew v0.2.0 RC.2**。近期 ChatGPT Desktop 更改內附 Codex CLI 的封裝配置後，RC.2 修復 Codex 額度偵測，並保留對先前內附 runtime、支援的舊版 Codex.app 與獨立 CLI 備援路徑的相容性。Beta 1 以先前的 QuotaPulse 名稱發行，其歷史發行紀錄與產物保留原名。
 
-請從 [QuotaMew v0.2.0-rc.1 Release](https://github.com/YinCheng0106/QuotaMew/releases/tag/v0.2.0-rc.1) 下載 `QuotaMew-v0.2.0-rc.1.dmg`。
+請從 [QuotaMew v0.2.0-rc.2 Release](https://github.com/YinCheng0106/QuotaMew/releases/tag/v0.2.0-rc.2) 下載 `QuotaMew-v0.2.0-rc.2.dmg`。
 
 1. 下載最新的 `.dmg`。
 2. 開啟磁碟映像檔。
@@ -165,7 +165,7 @@ Beta 3 依精確的正規化 duration，讓 Dashboard、VoiceOver 與通知共�
 
 左鍵維持切換 Dashboard；右鍵開啟原生選單，提供「**立即重新整理**」、「**設定…**」與「**退出 QuotaMew**」，沿用既有刷新、Settings scene 與正常結束流程。
 
-Milestone A／B、Product Polish 與 **Milestone C — Onboarding** 已完成。RC.1 凍結 v0.2.0 功能範圍，專注於最終發行驗證與穩定性。外部 Reset Intelligence feed／network／matching 工作移至 v0.3。詳見 [v0.2 計畫](docs/V0_2_PLAN.md) 與[人工驗收清單](docs/RUNTIME_TESTING.md#v02-product-polish-acceptance)。
+Milestone A／B、Product Polish 與 **Milestone C — Onboarding** 已完成。RC.2 維持 v0.2.0 凍結的功能範圍，聚焦修復 ChatGPT Desktop Codex runtime 相容性並完成發行驗證。外部 Reset Intelligence feed／network／matching 工作移至 v0.3。詳見 [v0.2 計畫](docs/V0_2_PLAN.md) 與[人工驗收清單](docs/RUNTIME_TESTING.md#v02-product-polish-acceptance)。
 
 QuotaMew 現已包含本機 reset-cycle detection。未來可能進行經審查的 Claude Code opt-in bridge、更廣泛的 provider 與硬體驗證、簽章與 notarization，以及保留來源連結的官方 Reset Intelligence feed 擷取；這些未來項目都不是目前已實作功能。詳情請參閱 [ROADMAP.md](ROADMAP.md)。
 
