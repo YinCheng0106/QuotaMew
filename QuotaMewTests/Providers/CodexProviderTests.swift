@@ -367,6 +367,14 @@ final class CodexProviderTests: XCTestCase {
         }
         XCTAssertEqual(Bundle.main.bundleIdentifier, debugBundleIdentifier)
 
+        let locator = CodexExecutableLocator()
+        let runtime = try XCTUnwrap(locator.locate())
+        let category = runtime.path.contains("/Contents/Resources/codex-cli/")
+            ? "packagedChatGPT"
+            : (runtime.path.contains("/Contents/Resources/codex")
+                ? "legacyBundle" : "standalone")
+        XCTAssertEqual(locator.diagnosticSnapshot().runtimeDetected, true)
+
         let snapshot = try await CodexProvider().fetchUsage()
 
         XCTAssertEqual(snapshot.providerID, .codex)
@@ -375,6 +383,7 @@ final class CodexProviderTests: XCTestCase {
         XCTAssertTrue(snapshot.windows.allSatisfy { window in
             !window.id.isEmpty && (window.usedPercentage != nil || window.resetAt != nil)
         })
+        print("Live Codex: runtimeCategory=\(category), validWindowCount=\(snapshot.windows.count)")
     }
 }
 

@@ -48,6 +48,117 @@ final class CodexExecutableLocatorTests: XCTestCase {
         XCTAssertEqual(locator.locate(), resolved(bundledExecutable(in: chatGPTApp)))
     }
 
+    func testPackagedChatGPTRuntimePrecedesLegacyAndStandalone() throws {
+        let app = try makeDesktopApp(at: root.appending(path: "ChatGPT.app"), name: "ChatGPT")
+        let packaged = try makePackagedRuntime(in: app)
+        let standalone = try makeExecutable(at: root.appending(path: "bin/codex"))
+        let locator = makeLocator(
+            chatGPTApplicationURLs: [app], applicationURLs: [], standaloneURLs: [standalone]
+        )
+
+        XCTAssertEqual(locator.locate(), resolved(packaged))
+        XCTAssertEqual(locator.diagnosticSnapshot().runtimeSource, .chatGPTApplication)
+    }
+
+    func testValidManifestEntrypointIsUsedBeforeKnownPackagedPath() throws {
+        let app = try makeDesktopApp(at: root.appending(path: "ChatGPT.app"), name: "ChatGPT")
+        _ = try makePackagedRuntime(in: app, entrypoint: "bin/custom-codex")
+        let known = try makeExecutable(at: package(in: app).appending(path: "bin/codex"))
+        let locator = makeLocator(chatGPTApplicationURLs: [app], applicationURLs: [])
+
+        XCTAssertEqual(locator.locate(), resolved(package(in: app).appending(path: "bin/custom-codex")))
+        XCTAssertNotEqual(locator.locate(), resolved(known))
+    }
+
+    func testMalformedAndUnsupportedManifestsUseKnownPackagedFallback() throws {
+        let app = try makeDesktopApp(at: root.appending(path: "ChatGPT.app"), name: "ChatGPT")
+        let known = try makePackagedRuntime(in: app)
+        let manifest = package(in: app).appending(path: "codex-package.json")
+        let locator = makeLocator(chatGPTApplicationURLs: [app], applicationURLs: [])
+
+        try Data("{".utf8).write(to: manifest)
+        XCTAssertEqual(locator.locate(), resolved(known))
+
+        try writeManifest(in: app, entrypoint: "bin/codex", layoutVersion: 2)
+        XCTAssertEqual(locator.locate(), resolved(known))
+
+        try Data(repeating: 0x20, count: 4_097).write(to: manifest)
+        XCTAssertEqual(locator.locate(), resolved(known))
+    }
+
+    func testManifestCannotUseAbsoluteOrTraversalEntrypoint() throws {
+        let app = try makeDesktopApp(at: root.appending(path: "ChatGPT.app"), name: "ChatGPT")
+        let known = try makePackagedRuntime(in: app)
+        let outside = try makeExecutable(at: root.appending(path: "outside/codex"))
+        let locator = makeLocator(chatGPTApplicationURLs: [app], applicationURLs: [])
+
+        try writeManifest(in: app, entrypoint: outside.path)
+        XCTAssertEqual(locator.locate(), resolved(known))
+
+        try writeManifest(in: app, entrypoint: "../../../../../../outside/codex")
+        XCTAssertEqual(locator.locate(), resolved(known))
+    }
+
+    func testManifestSymlinkCannotEscapePackageRoot() throws {
+        let app = try makeDesktopApp(at: root.appending(path: "ChatGPT.app"), name: "ChatGPT")
+        let known = try makePackagedRuntime(in: app)
+        let outside = try makeExecutable(at: root.appending(path: "outside/codex"))
+        let link = package(in: app).appending(path: "bin/escape")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+        try writeManifest(in: app, entrypoint: "bin/escape")
+
+        XCTAssertEqual(
+            makeLocator(chatGPTApplicationURLs: [app], applicationURLs: []).locate(),
+            resolved(known)
+        )
+    }
+
+    func testNonExecutablePackagedRuntimeIsRejectedAndReported() throws {
+        let app = try makeDesktopApp(at: root.appending(path: "ChatGPT.app"), name: "ChatGPT")
+        try FileManager.default.removeItem(at: bundledExecutable(in: app))
+        _ = try makePackagedRuntime(in: app, permissions: 0o644)
+        let locator = makeLocator(chatGPTApplicationURLs: [app], applicationURLs: [])
+
+        XCTAssertNil(locator.locate())
+        let diagnostics = locator.diagnosticSnapshot()
+        XCTAssertTrue(diagnostics.chatGPTApplication.isDetected)
+        XCTAssertFalse(diagnostics.runtimeDetected)
+        XCTAssertEqual(diagnostics.failureCategory, .runtimeNotExecutable)
+    }
+
+    func testCachedLegacyRuntimeTransitionsToPackagedRuntimeAfterDesktopUpdate() throws {
+        let app = try makeDesktopApp(at: root.appending(path: "ChatGPT.app"), name: "ChatGPT")
+        let locator = makeLocator(chatGPTApplicationURLs: [app], applicationURLs: [])
+        XCTAssertEqual(locator.locate(), resolved(bundledExecutable(in: app)))
+
+        try FileManager.default.removeItem(at: bundledExecutable(in: app))
+        let packaged = try makePackagedRuntime(in: app)
+        XCTAssertEqual(locator.locate(), resolved(packaged))
+    }
+
+    func testNSWorkspaceFindsPackagedRuntimeAtNonstandardLocation() throws {
+        let app = try makeDesktopApp(at: root.appending(path: "Elsewhere/ChatGPT.app"), name: "ChatGPT")
+        try FileManager.default.removeItem(at: bundledExecutable(in: app))
+        let packaged = try makePackagedRuntime(in: app)
+        let lookup = LookupStub(result: app)
+        let locator = makeLocator(
+            chatGPTApplicationURLs: [], applicationURLs: [], workspaceLookup: lookup.call
+        )
+
+        XCTAssertEqual(locator.locate(), resolved(packaged))
+        XCTAssertEqual(locator.diagnosticSnapshot().runtimeSource, .chatGPTApplication)
+    }
+
+    func testRejectsPackagedRuntimeWithUntrustedWritableAncestry() throws {
+        let app = try makeDesktopApp(at: root.appending(path: "ChatGPT.app"), name: "ChatGPT")
+        try FileManager.default.removeItem(at: bundledExecutable(in: app))
+        _ = try makePackagedRuntime(in: app)
+        let bin = package(in: app).appending(path: "bin")
+        try FileManager.default.setAttributes([.posixPermissions: 0o777], ofItemAtPath: bin.path)
+
+        XCTAssertNil(makeLocator(chatGPTApplicationURLs: [app], applicationURLs: []).locate())
+    }
+
     func testDiagnosticSnapshotReportsChatGPTWithoutExposingItsPath() throws {
         let chatGPTApp = try makeDesktopApp(
             at: root.appending(path: "Private User Folder/ChatGPT.app"),
@@ -324,6 +435,40 @@ final class CodexExecutableLocatorTests: XCTestCase {
 
     private func bundledExecutable(in app: URL) -> URL {
         app.appending(path: "Contents/Resources/codex")
+    }
+
+    private func package(in app: URL) -> URL {
+        app.appending(path: "Contents/Resources/codex-cli")
+    }
+
+    @discardableResult
+    private func makePackagedRuntime(
+        in app: URL,
+        entrypoint: String = "bin/codex",
+        permissions: Int = 0o755
+    ) throws -> URL {
+        let executable = try makeExecutable(
+            at: package(in: app).appending(path: entrypoint), permissions: permissions
+        )
+        try writeManifest(in: app, entrypoint: entrypoint)
+        return executable
+    }
+
+    private func writeManifest(
+        in app: URL,
+        entrypoint: String,
+        layoutVersion: Int = 1
+    ) throws {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "layoutVersion": layoutVersion,
+            "version": "0.158.0-alpha.2.1",
+            "target": "aarch64-apple-darwin",
+            "variant": "codex",
+            "entrypoint": entrypoint,
+            "resourcesDir": "codex-resources",
+            "pathDir": "codex-path"
+        ])
+        try data.write(to: package(in: app).appending(path: "codex-package.json"))
     }
 
     private func resolved(_ url: URL) -> URL {

@@ -1,6 +1,6 @@
 # Codex 用量資料探索
 
-狀態：2026-08-26 本機探索、ChatGPT.app／舊 Codex.app／CLI executable discovery、provider core 與共用應用程式串接完成。Production `AppDependencies` 已透過 `UsageProvider` 使用此 provider；SwiftUI previews 仍使用 mock 資料。
+狀態：2026-09-28 已驗證 ChatGPT.app 的新 `codex-cli` 套件版面，並保留舊 bundled runtime 與獨立 CLI 探索。Production `AppDependencies` 已透過 `UsageProvider` 使用此 provider；SwiftUI previews 仍使用 mock 資料。
 
 ## 結論
 
@@ -18,21 +18,21 @@ Codex 的實際額度百分比、額度視窗長度與下次重設時間可以�
 
 ## Executable discovery
 
-探索順序如下，不遞迴掃描磁碟，也不啟動 shell：
+探索順序如下，不遞迴掃描磁碟，也不使用 shell 搜尋；新套件提供的入口本身可能是 shell launcher：
 
-1. `/Applications/ChatGPT.app/Contents/Resources/codex`
-2. `~/Applications/ChatGPT.app/Contents/Resources/codex`
-3. 由 `NSWorkspace` 以 `com.openai.codex` 找到的非標準位置 `ChatGPT.app`
+1. `/Applications/ChatGPT.app`：先從 `Contents/Resources/codex-cli/codex-package.json` 取得經驗證的相對 `entrypoint`，再試已知的 `codex-cli/bin/codex`，最後試舊版 `Contents/Resources/codex`
+2. `~/Applications/ChatGPT.app`：使用同一套套件與舊版候選順序
+3. 由 `NSWorkspace` 以 `com.openai.codex` 找到的非標準位置 `ChatGPT.app`：使用同一套候選順序
 4. `/Applications/Codex.app/Contents/Resources/codex` 與 `~/Applications/Codex.app/Contents/Resources/codex`，作為舊版相容性 fallback
 5. 由同一個 `NSWorkspace` 查詢結果辨識的非標準位置舊 `Codex.app`
 6. `/opt/homebrew/bin/codex`、`/usr/local/bin/codex`、`~/.local/bin/codex`、`~/.bun/bin/codex`
 7. GUI process 實際繼承之 `PATH` 裡的絕對路徑
 
-Desktop 候選必須解析為名為 `ChatGPT.app` 或 `Codex.app`、bundle identifier 為 `com.openai.codex` 的 bundle；因兩者目前共用 identifier，identifier 只作為 `NSWorkspace` lookup hint，不能單獨視為可信身分。其 bundled binary 與所有 CLI 候選都必須解析 symlink 後為一般可執行檔，且其路徑祖先不可由不受信任帳號或 everyone 寫入。成功來源只在 process memory 中快取，每次使用前重新驗證；app 被移動、刪除、更新後改變 runtime，或 binary 失去執行權限時會重新解析或走完整探索。有效快取不會在每次 quota refresh 重複查詢 `NSWorkspace`。找不到時維持 `notInstalled`。
+Desktop 候選必須解析為名為 `ChatGPT.app` 或 `Codex.app`、bundle identifier 為 `com.openai.codex` 的 bundle；因兩者目前共用 identifier，identifier 只作為 `NSWorkspace` lookup hint，不能單獨視為可信身分。其 bundled binary 與所有 CLI 候選都必須解析 symlink 後為一般可執行檔，且其路徑祖先不可由不受信任帳號或 everyone 寫入。套件 manifest 最多讀取 4 KiB；僅接受已理解的 layout version 與 `codex` variant，入口必須是無絕對路徑、`..`、空 segment 或 NUL 的相對路徑，解析後仍位於受信任套件目錄內。manifest 缺少、無效或指向不可執行檔時，仍逐一驗證已知套件入口與舊版入口。成功來源只在 process memory 中快取，每次使用前重新驗證；app 被移動、刪除、更新後改變 runtime，或 binary 失去執行權限時會重新解析或走完整探索。有效快取不會在每次 quota refresh 重複查詢 `NSWorkspace`。找不到時維持 `notInstalled`；已偵測到 host app 時，Diagnostics 另以「Runtime unavailable／Runtime not detected」標示 runtime 問題。
 
 QuotaMew 把所有 runtime 探索保留在同一個 locator，並共用 bundle 身分、一般檔案、symlink、路徑權限、受限 `PATH`、快取及 stale recovery 驗證；沒有在 app-server client 內建立第二套 discovery。
 
-本機 ChatGPT `26.818.61809` 的簽章 bundle 內含 arm64 `Contents/Resources/codex`，版本為 `codex-cli 0.149.0-alpha.4.3`。此位置與既有 Desktop packaging 一致，且可實際完成 app-server request，因此目前列為首選；它仍不是獨立公開的檔案位置 contract，所以 locator 會在每次使用前驗證並保留舊 Codex.app、standalone CLI 與安全 `PATH` fallback。
+歷史本機 ChatGPT `26.818.61809` 的簽章 bundle 內含 arm64 `Contents/Resources/codex`，版本為 `codex-cli 0.149.0-alpha.4.3`。2026-09-28 本機 ChatGPT `26.924.22138`（build `11645`）已無此舊檔；新的 `Contents/Resources/codex-cli/codex-package.json` 宣告 layout version `1`、variant `codex`、`entrypoint: bin/codex`、target `aarch64-apple-darwin`、version `0.158.0-alpha.2.1`、`resourcesDir: codex-resources` 與 `pathDir: codex-path`。`bin/codex` 是 shell launcher，以 `exec` 啟動套件內 `CodexCLI.app/Contents/MacOS/codex`。它在本機可完成 app-server request。這些 bundle 內路徑是經驗證的封裝候選，**不是 OpenAI 承諾維持的公開 API**；定位器仍保留舊 Codex.app、standalone CLI 與安全 `PATH` fallback。
 
 ## 探索方法與隱私限制
 
@@ -153,7 +153,7 @@ Schema-only 搜尋沒有找到專用 quota、rate-limit、usage 或 reset column
 
 ## 本機 protocol 驗證
 
-本次以安裝中 ChatGPT.app bundled Codex binary `codex-cli 0.149.0-alpha.4.3` 做 sanitized live probe：
+歷史上曾以當時安裝的 ChatGPT.app bundled Codex binary `codex-cli 0.149.0-alpha.4.3` 做 sanitized live probe；2026-09-28 再以目前套件宣告的 `bin/codex`（`codex-cli 0.158.0-alpha.2.1`）執行同一流程：
 
 1. 啟動 `codex app-server`
 2. 傳送 stable `initialize`
@@ -162,7 +162,7 @@ Schema-only 搜尋沒有找到專用 quota、rate-limit、usage 或 reset column
 5. 只檢查 response keys 與 types
 6. 關閉 process，不輸出實際 quota values
 
-結果：request 成功，`rateLimits` 與 `rateLimitsByLimitId` 均存在；測試 account 回傳一個 bucket，primary window 的三個必要欄位都是 numeric。這只證明本機版本與 authentication 在測試當下可用，不代表所有 Codex versions 或 auth modes 都已驗證。
+目前套件的 request 成功，`rateLimits` 與 `rateLimitsByLimitId` 均存在，且回傳有效的 window 欄位型別；正式 opt-in `CodexProvider().fetchUsage()` 測試取得兩個有效 windows。探測僅記錄 schema、型別與數量，不輸出私人額度或帳號值。這只證明本機版本與 authentication 在測試當下可用，不代表所有 Codex versions 或 auth modes 都已驗證。
 
 Production app assembly 的本機驗證也成功：locator 選到 ChatGPT.app runtime，`CodexProvider` 產生含兩個有效 windows 的 `ProviderUsageSnapshot`，共用 UI 顯示實際 usage 與 reset 資料。現行單一 child、健康 connection 重用、重連與 reap 已由 process-boundary tests 驗證，並完成 `docs/PERFORMANCE.md` 記錄的一小時 Release runtime 測試。這只代表該次環境與觀察期間；更長的 8／24 小時 soak 仍可作為後續信心檢查。這項範圍不包含其他 Codex／ChatGPT 開發工具為自身工作而啟動的 app-server。
 
@@ -172,7 +172,7 @@ ChatGPT.app bundle 內的 Codex binary path 屬於 packaging detail，官方文�
 
 `CodexProvider` 與 `CodexAppServerClient` 已加入資料層，並透過共用 `UsageProvider`、`UsageService` 與 `ProviderState` 接到 UI：
 
-- 不使用 shell 或 login shell
+- 不自行組裝 shell 指令或啟動 login shell；若套件宣告的入口是 OpenAI 提供的 shell launcher，仍由 `Process` 直接啟動該入口
 - 只傳送 `initialize`、`initialized` 與 `account/rateLimits/read`
 - 不開啟 `experimentalApi`
 - 支援 single-bucket 與 multi-bucket response

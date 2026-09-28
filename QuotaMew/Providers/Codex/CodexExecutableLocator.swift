@@ -15,6 +15,16 @@ final class CodexExecutableLocator: @unchecked Sendable {
     static let chatGPTBundleIdentifier = "com.openai.codex"
     static let codexBundleIdentifier = chatGPTBundleIdentifier
     private static let bundledExecutablePath = "Contents/Resources/codex"
+    private static let packagePath = "Contents/Resources/codex-cli"
+    private static let packageManifestName = "codex-package.json"
+    private static let packagedExecutablePath = "bin/codex"
+    private static let maximumManifestBytes = 4_096
+
+    private struct PackageManifest: Decodable {
+        let layoutVersion: Int
+        let variant: String
+        let entrypoint: String
+    }
 
     private enum ApplicationKind {
         case chatGPT
@@ -149,11 +159,13 @@ final class CodexExecutableLocator: @unchecked Sendable {
             } + applicationURLs.compactMap {
                 Self.applicationBundle(at: $0, kind: .legacyCodex)
             }
-            let bundledCandidates = appBundles.map {
-                $0.bundleURL.appending(
-                    path: Self.bundledExecutablePath,
-                    directoryHint: .notDirectory
-                )
+            let bundledCandidates = appBundles.flatMap { bundle in
+                let package = bundle.bundleURL.appending(path: Self.packagePath)
+                return [
+                    Self.manifestEntrypoint(in: package),
+                    package.appending(path: Self.packagedExecutablePath),
+                    bundle.bundleURL.appending(path: Self.bundledExecutablePath)
+                ].compactMap { $0 }
             }
             hasInvalidCandidate = (bundledCandidates + standaloneURLs).contains {
                 FileManager.default.fileExists(atPath: $0.path)
@@ -221,9 +233,75 @@ final class CodexExecutableLocator: @unchecked Sendable {
 
     private static func executable(in applicationURL: URL, kind: ApplicationKind) -> URL? {
         guard let bundle = applicationBundle(at: applicationURL, kind: kind) else { return nil }
+        if kind == .chatGPT {
+            let package = bundle.bundleURL.appending(path: packagePath, directoryHint: .isDirectory)
+            if let entrypoint = manifestEntrypoint(in: package),
+               let executable = validatedPackagedExecutable(entrypoint, in: package) {
+                return executable
+            }
+            let knownEntrypoint = package.appending(
+                path: packagedExecutablePath, directoryHint: .notDirectory
+            )
+            if let executable = validatedPackagedExecutable(knownEntrypoint, in: package) {
+                return executable
+            }
+        }
         return validatedExecutable(
             bundle.bundleURL.appending(path: bundledExecutablePath, directoryHint: .notDirectory)
         )
+    }
+
+    private static func manifestEntrypoint(in package: URL) -> URL? {
+        let manifestURL = package.appending(path: packageManifestName, directoryHint: .notDirectory)
+        guard let packagePath = canonicalPackagePath(package),
+              let manifestPath = canonicalPath(manifestURL.path),
+              isInside(manifestPath, root: packagePath),
+              hasTrustedAncestry(manifestURL),
+              hasTrustedAncestry(URL(fileURLWithPath: manifestPath)),
+              let attributes = try? FileManager.default.attributesOfItem(atPath: manifestPath),
+              attributes[.type] as? FileAttributeType == .typeRegular,
+              let size = attributes[.size] as? NSNumber,
+              size.int64Value > 0, size.int64Value <= Int64(maximumManifestBytes),
+              let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: manifestPath))
+        else { return nil }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: maximumManifestBytes + 1),
+              data.count <= maximumManifestBytes,
+              let manifest = try? JSONDecoder().decode(PackageManifest.self, from: data),
+              manifest.layoutVersion == 1, manifest.variant == "codex",
+              !manifest.entrypoint.hasPrefix("/"),
+              !manifest.entrypoint.utf8.contains(0) else { return nil }
+        let components = manifest.entrypoint.split(
+            separator: "/", omittingEmptySubsequences: false
+        )
+        guard !components.isEmpty,
+              components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+            return nil
+        }
+        return package.appending(path: manifest.entrypoint, directoryHint: .notDirectory)
+    }
+
+    private static func validatedPackagedExecutable(_ candidate: URL, in package: URL) -> URL? {
+        guard let packagePath = canonicalPackagePath(package),
+              let candidatePath = canonicalPath(candidate.path),
+              isInside(candidatePath, root: packagePath),
+              let executable = validatedExecutable(candidate) else { return nil }
+        return executable
+    }
+
+    private static func canonicalPackagePath(_ package: URL) -> String? {
+        let application = package.deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        guard let applicationPath = canonicalPath(application.path),
+              let packagePath = canonicalPath(package.path),
+              packagePath == applicationPath + "/Contents/Resources/codex-cli",
+              hasTrustedAncestry(package),
+              hasTrustedAncestry(URL(fileURLWithPath: packagePath)) else { return nil }
+        return packagePath
+    }
+
+    private static func isInside(_ path: String, root: String) -> Bool {
+        path.hasPrefix(root + "/")
     }
 
     private static func applicationBundle(

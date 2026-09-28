@@ -11,7 +11,7 @@ struct ProviderDiagnosticsView: View {
                 .font(.headline)
 
             LabeledContent("Enabled", value: yesNo(diagnostics.isEnabled))
-            LabeledContent("Availability", value: availability(diagnostics.availability))
+            LabeledContent("Availability", value: availability())
 
             if let hostApplication = diagnostics.hostApplication {
                 LabeledContent("Host app") {
@@ -75,8 +75,12 @@ struct ProviderDiagnosticsView: View {
         localized(value ? "Available" : "Unavailable")
     }
 
-    private func availability(_ value: DiagnosticAvailability) -> String {
-        switch value {
+    private func availability() -> String {
+        if diagnostics.availability == .notInstalled,
+           diagnostics.hostApplication?.isDetected == true {
+            return localized("Runtime not detected")
+        }
+        return switch diagnostics.availability {
         case .loading: localized("Loading")
         case .available: localized("Available")
         case .disabled: localized("Disabled")

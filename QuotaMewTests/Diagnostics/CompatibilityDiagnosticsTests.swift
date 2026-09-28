@@ -51,6 +51,10 @@ final class CompatibilityDiagnosticsTests: XCTestCase {
             diagnostics.providers.first?.lastFailureCategory,
             .runtimeNotDetected
         )
+        let report = CompatibilityDiagnosticsReport.make(from: diagnostics)
+        XCTAssertTrue(report.contains("Availability: Runtime unavailable"))
+        XCTAssertTrue(report.contains("ChatGPT.app Installed: Yes"))
+        XCTAssertTrue(report.contains("Runtime Detected: No"))
     }
 
     func testProviderDisabledIsExplicitAndKeepsRuntimeSnapshotCurrent() throws {

@@ -318,7 +318,7 @@ enum CompatibilityDiagnosticsReport {
                 "",
                 provider.providerID.displayName,
                 "Enabled: \(yesNo(provider.isEnabled))",
-                "Availability: \(englishAvailability(provider.availability))",
+                "Availability: \(englishAvailability(provider))",
             ])
             if let application = provider.hostApplication {
                 lines.append(
@@ -374,8 +374,12 @@ enum CompatibilityDiagnosticsReport {
         return formatter.string(from: date)
     }
 
-    private static func englishAvailability(_ value: DiagnosticAvailability) -> String {
-        switch value {
+    private static func englishAvailability(_ provider: ProviderDiagnosticSnapshot) -> String {
+        if provider.availability == .notInstalled,
+           provider.hostApplication?.isDetected == true {
+            return "Runtime unavailable"
+        }
+        return switch provider.availability {
         case .loading: "Loading"
         case .available: "Available"
         case .disabled: "Disabled"
