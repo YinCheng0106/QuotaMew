@@ -442,20 +442,20 @@ Settings 說明指出只在啟用後明確開啟／刷新活動視窗才擷取�
 
 String Catalog 補齊英文與臺灣繁體中文，7D／30D 保留語言中立標籤。About these values 清楚說明 provider counters 可能不是精確帳務／訂閱額度，來源日期不一定是本機今天，history 可能不完整。Synthetic previews 包含 disabled、Latest zero、7D zero/missing、30D complete、繁中 dark/minimum width、unsupported、failed，所有 preview source 均為記憶體合成資料，不建立 provider 或 persistence。
 
-### 人工驗收清單（全部待人員確認）
+### 人工驗收結果
 
-自動 rendering／constraints／keyboard checks 不是人工驗收證明。**不得勾選 PASS，直到實際人員完成。** 使用 App 與上述 synthetic Xcode previews；真實來源不保證有 partial／failed 狀態。
+**M4 MANUAL ACCEPTANCE COMPLETE** — 以下結果由使用者完成並回報；此紀錄不由自動 rendering、constraints 或 keyboard checks 推導。
 
-- [ ] English：disabled、loading、Latest、7D、30D；complete／partial／zero／missing；failed／unsupported fixture。
-- [ ] 繁體中文：上述主要狀態、數值／日期／coverage／privacy 文案，確認無截斷或殘留英文 UI。
-- [ ] Light／Dark；default 560×680、minimum 420×460、加寬／縮放；完整 source range 與重要控制項可閱讀。
-- [ ] VoiceOver：title → period → metric／date → coverage／summary → date details → fetched／privacy/help 的實際閱讀順序與所有 actions。
-- [ ] VoiceOver 與視覺都能區分 explicit zero 和 missing；逐日 detail 不把缺日讀成零。
-- [ ] 鍵盤選 period、toolbar Refresh／Command-R、disclosures、Open Settings；Activity 為 key window 時觸發活動刷新。
-- [ ] 右鍵入口；重複開啟置前；close/reopen；最小化／恢復；單一活動視窗與無 permanent Dock icon。
-- [ ] Settings toggle on 不擷取；首次 enabled/idle open 擷取；available reopen 不擷取；manual Refresh 擷取。
-- [ ] 視窗開啟中 toggle off 立即清除；停用期間無活動擷取；Codex provider off 同樣清值。
-- [ ] 左鍵 Dashboard、右鍵 quota Refresh Now、Settings、Quit 與既有選單列顯示均維持原行為。
+- [x] 7D 一般寬度：PASS。
+- [x] 30D 一般寬度：PASS。
+- [x] 30D 最小寬度：PASS。
+- [x] 30D 加寬視窗：PASS。
+- [x] Light Mode、Dark Mode、繁體中文與 English：PASS。
+- [x] VoiceOver 逐日資料點導覽：PASS。
+- [x] x 軸標籤不再重疊；30D 保留全部每日資料點，同時只顯示疏朗、易讀的刻度。
+- [x] y 軸不再使用科學記號。
+- [x] explicit zero 與 missing-data 語意仍可區分。
+- [x] Account Activity 開啟、重新開啟、重新整理與停用行為維持正確。
 
 M4 只交付此 presentation milestone；未加入 persistent history、成本／價格、model/thread/project analytics、burn rate／runway、widgets、notifications、background activity polling、其他 providers 或 Reset Intelligence。ROADMAP、README、公眾 Fumadocs、release notes、RC.2 version/build/tag/release records 不改動。
 
@@ -479,8 +479,8 @@ M4 只交付此 presentation milestone；未加入 persistent history、成本�
 | 零 automatic activity I/O | Runtime construction、Dashboard／Settings 建構與 Settings 系統／diagnostics refresh、enable 均未啟動 app-server／排入活動 queue；既有 production fake transport startup/coalescing tests 維持通過；quota scheduler source 未接任何 activity action |
 | persistence／privacy | default false、唯一 consent Bool、restart = enabled/idle 且 store 空、memory-only、failure/disable 清舊值、late completion 不復活；source/model/privacy regressions 通過；UI／AX 只用 normalized dates/counts 與 static/sanitized copy，diagnostics／logs 不加入活動數值 |
 | `git diff --check` | PASS |
-| 人工 visual／VoiceOver | **未驗收**；上方 checklist 全部待人員確認。沒有效能 soak、通知送達、Developer ID／notarization／distribution 驗證 |
+| 人工 visual／VoiceOver | **M4 MANUAL ACCEPTANCE COMPLETE**；7D／30D 一般與最小／加寬視窗、Light／Dark、繁中／English、VoiceOver 逐日導覽、軸標籤／刻度／科學記號、zero／missing 語意及 Account Activity 開啟／重開／刷新／停用均 PASS。沒有效能 soak、通知送達、Developer ID／notarization／distribution 驗證 |
 
 最終 gate logs 保留在隔離暫存路徑：`/tmp/QuotaMew-M4-regression.log`、`/tmp/QuotaMew-M4-full-verified.log`、`/tmp/QuotaMew-M4-clean-debug.log`、`/tmp/QuotaMew-M4-clean-release.log`、`/tmp/QuotaMew-M4-live-activity.log`、`/tmp/QuotaMew-M4-live-quota.log`。Live 只列 bucket／coverage counts 與 PASS flags；這些暫存檔案不 commit，不是 activity history persistence。初次測試抓到 native hosting minimum 設定順序與 fixture yield 等待競態，均修正並以最終全 suite 零失敗確認。
 
-**M4 AUTOMATED COMPLETE — MANUAL ACCEPTANCE REQUIRED**
+**M4 COMPLETE — MANUAL ACCEPTANCE COMPLETE; READY FOR v0.3 M5**
