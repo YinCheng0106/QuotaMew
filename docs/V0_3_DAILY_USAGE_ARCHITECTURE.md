@@ -1,6 +1,10 @@
 # v0.3 — Codex Account Activity 架構設計
 
-狀態：**READY TO IMPLEMENT v0.3 M0**。2026-10-02；僅設計，尚未實作或承諾 v0.3 發行。檔名沿用指定名稱；產品名稱不是 Daily Usage／History。
+架構核准狀態（M0 實作前）：**READY TO IMPLEMENT v0.3 M0**。2026-10-02；設計不代表承諾 v0.3 發行。檔名沿用指定名稱；產品名稱不是 Daily Usage／History。
+
+M0 implementation note（2026-10-02）：transport 已加入兩種 closed method、single active slot、每種 method 各一個 coalesced pending batch 與 quota priority。Caller interests（active + pending）合計最多 128；超限明確回報 `requestCapacityExceeded`，不 silently drop quota。每個 caller 可獨立取消，最後一個 active interest 撤銷才關閉 RPC／child，cleanup 完成才放行下一筆。`readAccountUsageTransport()` 只重用健康 quota connection；2 秒 timeout 可獨立注入，不含 queue 等待。M0 DTO 僅保留 optional daily collection 的 typed wire fields，不保留 summary／threadUsage，不做 M1 語意驗證。完整匹配 usage error 保留 child；壞 stream 仍完整 reap／await reader，再由下一個 quota demand 重連。其餘本文保持核准的後續設計，auth lifecycle signals／activity adapter／service／store／UI 尚未實作。
+
+M0 gates：16 個新增 deterministic transport tests 通過，mixed stress 最大 active RPC = 1、quota pending priority 通過；完整 XCTest 353 passed／0 failed／2 預期 opt-in skips；clean Debug／Release build 通過；既有 Live Codex quota test（`CodexProvider().fetchUsage()`，packaged ChatGPT runtime）1 passed／0 skipped。未做 live account activity 驗證或效能量測。**目前狀態：READY TO IMPLEMENT v0.3 M1**；M1+ 功能仍未實作。
 
 ## 1. 範圍與非目標
 

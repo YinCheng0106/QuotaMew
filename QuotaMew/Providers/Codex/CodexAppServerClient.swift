@@ -18,6 +18,7 @@ enum CodexAppServerError: Error, Equatable, Sendable {
     case invalidResponse
     case serverError(code: Int?)
     case noResponse
+    case requestCapacityExceeded
 }
 
 extension CodexAppServerError: ProviderStatusProvidingError {
@@ -27,7 +28,7 @@ extension CodexAppServerError: ProviderStatusProvidingError {
             .notInstalled
         case .launchFailed:
             .failed(.runtimeLaunchFailed)
-        case .timeout, .responseTooLarge, .invalidResponse, .serverError, .noResponse:
+        case .timeout, .responseTooLarge, .invalidResponse, .serverError, .noResponse, .requestCapacityExceeded:
             .failed(.refreshFailed)
         }
     }
@@ -35,23 +36,31 @@ extension CodexAppServerError: ProviderStatusProvidingError {
 
 actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReading {
     private static let initializeRequestID = 1
-    private static let firstRateLimitsRequestID = 2
+    private static let firstRequestID = 2
+    // Bounded caller interests, including active and queued coalesced batches.
+    static let maximumRequestWaiters = 128
 
     private let executableURL: URL?
     private let locator: CodexExecutableLocator?
     private let arguments: [String]
     private let timeout: Duration
+    private let activityTimeout: Duration
     private let maximumResponseBytes: Int
     private let lifecycle: CodexConnectionLifecycle
 
-    private struct InFlightRequest {
+    private struct RequestBatch {
         let generation: UInt64
-        let task: Task<CodexRateLimitsResult, Error>
+        let method: CodexRequestMethod
+        var waiters: [UUID: CheckedContinuation<CodexTransportResult, Error>]
+        var task: Task<Void, Never>?
     }
 
-    private var nextRequestID = firstRateLimitsRequestID
+    private var nextRequestID = firstRequestID
     private var nextRequestGeneration: UInt64 = 1
-    private var inFlightRequest: InFlightRequest?
+    private var activeRequest: RequestBatch?
+    private var pendingQuota: RequestBatch?
+    private var pendingActivity: RequestBatch?
+    private var isShutdown = false
     private var hasStartedAppServerProcess = false
     private var lastRequestSucceeded = false
     private var lastFailureCategory: DiagnosticFailureCategory?
@@ -60,6 +69,7 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
         executableURL: URL,
         arguments: [String] = ["app-server"],
         timeout: Duration = .seconds(5),
+        activityTimeout: Duration = .seconds(2),
         maximumResponseBytes: Int = 1_048_576,
         notificationCenter: NotificationCenter = .default
     ) {
@@ -67,6 +77,7 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
         self.locator = nil
         self.arguments = arguments
         self.timeout = timeout
+        self.activityTimeout = activityTimeout
         self.maximumResponseBytes = max(maximumResponseBytes, 1)
         self.lifecycle = CodexConnectionLifecycle(notificationCenter: notificationCenter)
     }
@@ -74,6 +85,7 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
     init(
         locator: CodexExecutableLocator,
         timeout: Duration = .seconds(5),
+        activityTimeout: Duration = .seconds(2),
         maximumResponseBytes: Int = 1_048_576,
         notificationCenter: NotificationCenter = .default
     ) {
@@ -81,13 +93,16 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
         self.locator = locator
         self.arguments = ["app-server"]
         self.timeout = timeout
+        self.activityTimeout = activityTimeout
         self.maximumResponseBytes = max(maximumResponseBytes, 1)
         self.lifecycle = CodexConnectionLifecycle(notificationCenter: notificationCenter)
     }
 
     func readRateLimits() async throws -> CodexRateLimitsResult {
         do {
-            let result = try await readRateLimitsCoalesced()
+            guard case .rateLimits(let result) = try await request(.rateLimits) else {
+                throw CodexAppServerError.invalidResponse
+            }
             lastRequestSucceeded = true
             lastFailureCategory = nil
             return result
@@ -98,6 +113,15 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
             lastFailureCategory = Self.failureCategory(for: error)
             throw error
         }
+    }
+
+    // Transport only: no activity-domain mapping, persistence, or production caller yet.
+    // Activity may reuse a healthy quota connection, but never launches/reconnects one.
+    func readAccountUsageTransport() async throws -> CodexAccountUsageTransportResult {
+        guard case .accountUsage(let result) = try await request(.accountUsage) else {
+            throw CodexAppServerError.invalidResponse
+        }
+        return result
     }
 
     func runtimeDiagnostic() async -> ProviderRuntimeDiagnostic {
@@ -151,64 +175,154 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
         )
     }
 
-    private func readRateLimitsCoalesced() async throws -> CodexRateLimitsResult {
-        if let inFlightRequest {
-            return try await awaitRequest(inFlightRequest.task)
-        }
-
-        let generation = nextRequestGeneration
-        nextRequestGeneration &+= 1
-        let task = Task {
-            try await performReadRateLimits()
-        }
-        inFlightRequest = InFlightRequest(generation: generation, task: task)
-
-        do {
-            let result = try await awaitRequest(task)
-            clearInFlightRequest(generation: generation)
-            return result
-        } catch {
-            clearInFlightRequest(generation: generation)
-            throw error
-        }
-    }
-
     func shutdown() async {
-        inFlightRequest?.task.cancel()
-        inFlightRequest = nil
-
+        isShutdown = true
+        let task = activeRequest?.task
+        task?.cancel()
+        for batch in [pendingQuota, pendingActivity] {
+            batch?.waiters.values.forEach { $0.resume(throwing: CancellationError()) }
+        }
+        pendingQuota = nil
+        pendingActivity = nil
         if let connection = lifecycle.beginShutdown() {
             await connection.stop()
         }
+        await task?.value
     }
 
-    private func clearInFlightRequest(generation: UInt64) {
-        guard inFlightRequest?.generation == generation else { return }
-        inFlightRequest = nil
-    }
-
-    private func awaitRequest(
-        _ task: Task<CodexRateLimitsResult, Error>
-    ) async throws -> CodexRateLimitsResult {
-        try await withTaskCancellationHandler {
-            try await task.value
+    private func request(_ method: CodexRequestMethod) async throws -> CodexTransportResult {
+        try Task.checkCancellation()
+        let waiterID = UUID()
+        return try await withTaskCancellationHandler {
+            let result: CodexTransportResult = try await withCheckedThrowingContinuation { continuation in
+                // No suspension between cancellation check, admission and registration.
+                guard !Task.isCancelled, !isShutdown else {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                guard waiterCount < Self.maximumRequestWaiters else {
+                    continuation.resume(throwing: CodexAppServerError.requestCapacityExceeded)
+                    return
+                }
+                admit(method, waiterID: waiterID, continuation: continuation)
+            }
+            try Task.checkCancellation()
+            return result
         } onCancel: {
-            task.cancel()
-            lifecycle.stopCurrentConnection()
+            Task { await self.cancelWaiter(waiterID) }
         }
     }
 
-    private func performReadRateLimits() async throws -> CodexRateLimitsResult {
+    private var waiterCount: Int {
+        (activeRequest?.waiters.count ?? 0) + (pendingQuota?.waiters.count ?? 0)
+            + (pendingActivity?.waiters.count ?? 0)
+    }
+
+    private func admit(
+        _ method: CodexRequestMethod,
+        waiterID: UUID,
+        continuation: CheckedContinuation<CodexTransportResult, Error>
+    ) {
+        // Keep quota coalescing. New activity demand waits behind already queued quota.
+        if activeRequest?.method == method,
+           activeRequest?.task?.isCancelled == false,
+           method == .rateLimits || pendingQuota == nil {
+            activeRequest?.waiters[waiterID] = continuation
+            return
+        }
+        var batch = method == .rateLimits ? pendingQuota : pendingActivity
+        if batch == nil {
+            batch = RequestBatch(generation: nextRequestGeneration, method: method, waiters: [:])
+            nextRequestGeneration &+= 1
+        }
+        batch?.waiters[waiterID] = continuation
+        if method == .rateLimits { pendingQuota = batch } else { pendingActivity = batch }
+        startNextRequest()
+    }
+
+    private func startNextRequest() {
+        guard activeRequest == nil, !isShutdown else { return }
+        if let quota = pendingQuota {
+            activeRequest = quota
+            pendingQuota = nil
+        } else if let activity = pendingActivity {
+            activeRequest = activity
+            pendingActivity = nil
+        } else {
+            return
+        }
+        guard let batch = activeRequest else { return }
+        activeRequest?.task = Task {
+            let result: Result<CodexTransportResult, Error>
+            do { result = .success(try await performRequest(batch.method)) }
+            catch { result = .failure(error) }
+            finishRequest(generation: batch.generation, result: result)
+        }
+    }
+
+    private func finishRequest(generation: UInt64, result: Result<CodexTransportResult, Error>) {
+        guard let batch = activeRequest, batch.generation == generation else { return }
+        // performRequest has cleared correlation and fully awaited any reader/process cleanup.
+        activeRequest = nil
+        batch.waiters.values.forEach { $0.resume(with: result) }
+        startNextRequest()
+    }
+
+    private func cancelWaiter(_ id: UUID) {
+        if let waiter = activeRequest?.waiters.removeValue(forKey: id) {
+            waiter.resume(throwing: CancellationError())
+            if activeRequest?.waiters.isEmpty == true { activeRequest?.task?.cancel() }
+            // The cancelled worker retains the slot through disconnect/reap/reader completion.
+        } else if let waiter = pendingQuota?.waiters.removeValue(forKey: id) {
+            waiter.resume(throwing: CancellationError())
+            if pendingQuota?.waiters.isEmpty == true { pendingQuota = nil }
+        } else if let waiter = pendingActivity?.waiters.removeValue(forKey: id) {
+            waiter.resume(throwing: CancellationError())
+            if pendingActivity?.waiters.isEmpty == true { pendingActivity = nil }
+        }
+    }
+
+    #if DEBUG
+    // Admission synchronization for deterministic transport tests; no payload or runtime polling.
+    func requestQueueCounts() -> (active: Int, quota: Int, activity: Int) {
+        (activeRequest?.waiters.count ?? 0, pendingQuota?.waiters.count ?? 0,
+         pendingActivity?.waiters.count ?? 0)
+    }
+    #endif
+
+    private func performRequest(_ method: CodexRequestMethod) async throws -> CodexTransportResult {
         try Task.checkCancellation()
-        let connection = try await healthyConnection()
+        let connection: ManagedCodexConnection
+        if method == .rateLimits {
+            connection = try await healthyConnection()
+        } else {
+            guard let healthy = lifecycle.connection, healthy.isHealthy else {
+                throw CodexAppServerError.noResponse
+            }
+            connection = healthy
+        }
         let requestID = nextRequestID
-        nextRequestID = nextRequestID == Int.max ? Self.firstRateLimitsRequestID : nextRequestID + 1
+        nextRequestID = nextRequestID == Int.max ? Self.firstRequestID : nextRequestID + 1
+        defer { connection.clearExpectedResponse() }
 
         do {
-            try connection.writeRateLimitsRequest(id: requestID)
-            return try await response(id: requestID, from: connection)
+            try Task.checkCancellation()
+            return try await withTaskCancellationHandler {
+                try connection.writeRequest(CodexRequest(id: requestID, method: method))
+                return try await response(
+                    id: requestID, from: connection,
+                    timeout: method == .rateLimits ? timeout : activityTimeout
+                )
+            } onCancel: {
+                connection.requestStop()
+            }
         } catch {
-            await disconnect(connection)
+            // A consumed, correlated usage error cannot desynchronize the stream.
+            // Quota retains its existing disconnect-on-failure policy.
+            if method == .rateLimits || !connection.isHealthy
+                || !connection.hasConsumedResponse {
+                await disconnect(connection)
+            }
             try Task.checkCancellation()
             throw error
         }
@@ -227,6 +341,7 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
         if let staleConnection = lifecycle.takeConnection() {
             await staleConnection.stop()
         }
+        try Task.checkCancellation()
 
         guard let executableURL = locator?.locate() ?? executableURL,
               FileManager.default.isExecutableFile(atPath: executableURL.path) else {
@@ -287,10 +402,11 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
 
     private func response(
         id: Int,
-        from connection: ManagedCodexConnection
-    ) async throws -> CodexRateLimitsResult {
-        let timeout = timeout
-        return try await withThrowingTaskGroup(of: CodexRateLimitsResult.self) { group in
+        from connection: ManagedCodexConnection,
+        timeout: Duration
+    ) async throws -> CodexTransportResult {
+        return try await withThrowingTaskGroup(of: CodexTransportResult.self) { group in
+            defer { group.cancelAll() }
             group.addTask {
                 try await connection.response(for: id)
             }
@@ -324,16 +440,47 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
             return .appServerLaunchFailed
         case .timeout, .noResponse:
             return .appServerConnectionFailed
-        case .responseTooLarge, .invalidResponse, .serverError:
+        case .responseTooLarge, .invalidResponse, .serverError, .requestCapacityExceeded:
             return .rpcUnavailable
         }
     }
 }
 
-private struct CodexAppServerEnvelope: Decodable, Sendable {
+private enum CodexRequestMethod: String, Encodable, Sendable {
+    case rateLimits = "account/rateLimits/read"
+    case accountUsage = "account/usage/read"
+}
+
+private struct CodexRequest: Encodable, Sendable {
+    let id: Int
+    let method: CodexRequestMethod
+}
+
+private enum CodexTransportResult: Sendable {
+    case rateLimits(CodexRateLimitsResult)
+    case accountUsage(CodexAccountUsageTransportResult)
+}
+
+private struct CodexResponseHeader: Decodable {
     let id: Int?
-    let result: CodexRateLimitsResult?
+}
+
+private struct CodexResponsePayload<Value: Decodable>: Decodable {
+    let result: Value?
     let error: CodexAppServerResponseError?
+
+    private enum CodingKeys: String, CodingKey { case result, error }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        error = try container.decodeIfPresent(CodexAppServerResponseError.self, forKey: .error)
+        result = error == nil ? try container.decodeIfPresent(Value.self, forKey: .result) : nil
+    }
+}
+
+private struct CodexAppServerEnvelope: Sendable {
+    let id: Int
+    let result: Result<CodexTransportResult, CodexAppServerError>
 }
 
 private struct CodexAppServerResponseError: Decodable, Sendable {
@@ -394,10 +541,6 @@ private final class CodexConnectionLifecycle: @unchecked Sendable {
         }
     }
 
-    func stopCurrentConnection() {
-        takeConnection()?.requestStop()
-    }
-
     func beginShutdown() -> ManagedCodexConnection? {
         lock.withLock {
             isShutdown = true
@@ -413,19 +556,27 @@ private final class CodexConnectionLifecycle: @unchecked Sendable {
 
 private final class ExpectedCodexResponse: @unchecked Sendable {
     private let lock = NSLock()
-    private var requestID: Int?
+    private var request: CodexRequest?
+    private var consumed = false
 
-    func set(_ requestID: Int) {
+    func set(_ request: CodexRequest?) {
         lock.withLock {
-            self.requestID = requestID
+            self.request = request
+            consumed = false
         }
     }
 
-    func matches(_ requestID: Int?) -> Bool {
+    // Claim exactly once so duplicate responses cannot replace the one-element buffer.
+    func consume(_ requestID: Int?) -> CodexRequestMethod? {
         lock.withLock {
-            requestID == self.requestID
+            guard let request, requestID == request.id else { return nil }
+            self.request = nil
+            consumed = true
+            return request.method
         }
     }
+
+    var hasConsumedResponse: Bool { lock.withLock { consumed } }
 }
 
 private final class ManagedCodexConnection: @unchecked Sendable {
@@ -490,45 +641,48 @@ private final class ManagedCodexConnection: @unchecked Sendable {
     }
 
     func writeInitialization(id: Int) throws {
-        try write([
-            [
-                "method": "initialize",
-                "id": id,
-                "params": [
-                    "clientInfo": [
-                        "name": "quota_pulse",
-                        "title": "QuotaMew",
-                        "version": "0.1.0"
-                    ]
-                ]
-            ],
-            [
-                "method": "initialized",
-                "params": [:]
-            ]
-        ])
+        struct Initialize: Encodable {
+            struct Params: Encodable {
+                struct ClientInfo: Encodable {
+                    let name = "quota_pulse"
+                    let title = "QuotaMew"
+                    let version = "0.1.0"
+                }
+                let clientInfo = ClientInfo()
+            }
+            let method = "initialize"
+            let id: Int
+            let params = Params()
+        }
+        struct Initialized: Encodable {
+            struct Params: Encodable {}
+            let method = "initialized"
+            let params = Params()
+        }
+        var data = try JSONEncoder().encode(Initialize(id: id))
+        data.append(0x0A)
+        data.append(try JSONEncoder().encode(Initialized()))
+        data.append(0x0A)
+        try write(data)
     }
 
-    func writeRateLimitsRequest(id: Int) throws {
-        expectedResponse.set(id)
-        try write([[
-            "method": "account/rateLimits/read",
-            "id": id
-        ]])
+    func writeRequest(_ request: CodexRequest) throws {
+        expectedResponse.set(request)
+        var data = try JSONEncoder().encode(request)
+        data.append(0x0A)
+        try write(data)
     }
 
-    func response(for requestID: Int) async throws -> CodexRateLimitsResult {
+    var hasConsumedResponse: Bool { expectedResponse.hasConsumedResponse }
+
+    func clearExpectedResponse() { expectedResponse.set(nil) }
+
+    func response(for requestID: Int) async throws -> CodexTransportResult {
         do {
             for try await envelope in responses {
                 guard envelope.id == requestID else { continue }
 
-                if let error = envelope.error {
-                    throw CodexAppServerError.serverError(code: error.code)
-                }
-                guard let result = envelope.result else {
-                    throw CodexAppServerError.invalidResponse
-                }
-                return result
+                return try envelope.result.get()
             }
         } catch {
             if timedOut {
@@ -612,7 +766,7 @@ private final class ManagedCodexConnection: @unchecked Sendable {
         return didTimeOut
     }
 
-    private func write(_ requests: [[String: Any]]) throws {
+    private func write(_ data: Data) throws {
         condition.lock()
         defer { condition.unlock() }
 
@@ -621,11 +775,7 @@ private final class ManagedCodexConnection: @unchecked Sendable {
         }
 
         do {
-            for request in requests {
-                var data = try JSONSerialization.data(withJSONObject: request)
-                data.append(0x0A)
-                try input.write(contentsOf: data)
-            }
+            try input.write(contentsOf: data)
         } catch let error as CodexAppServerError {
             throw error
         } catch {
@@ -685,14 +835,34 @@ private enum CodexStdoutReader {
     ) throws {
         guard !data.isEmpty else { return }
 
-        let envelope: CodexAppServerEnvelope
+        let header: CodexResponseHeader
         do {
-            envelope = try JSONDecoder().decode(CodexAppServerEnvelope.self, from: data)
+            header = try JSONDecoder().decode(CodexResponseHeader.self, from: data)
         } catch {
             throw CodexAppServerError.invalidResponse
         }
 
-        guard expectedResponse.matches(envelope.id) else { return }
-        continuation.yield(envelope)
+        guard let id = header.id, let method = expectedResponse.consume(id) else { return }
+        let result: Result<CodexTransportResult, CodexAppServerError>
+        do {
+            switch method {
+            case .rateLimits:
+                result = .success(.rateLimits(try decodeResult(CodexRateLimitsResult.self, from: data)))
+            case .accountUsage:
+                result = .success(.accountUsage(try decodeResult(CodexAccountUsageTransportResult.self, from: data)))
+            }
+        } catch let error as CodexAppServerError {
+            result = .failure(error)
+        } catch {
+            result = .failure(.invalidResponse)
+        }
+        continuation.yield(CodexAppServerEnvelope(id: id, result: result))
+    }
+
+    private static func decodeResult<Value: Decodable>(_ type: Value.Type, from data: Data) throws -> Value {
+        let envelope = try JSONDecoder().decode(CodexResponsePayload<Value>.self, from: data)
+        if let error = envelope.error { throw CodexAppServerError.serverError(code: error.code) }
+        guard let result = envelope.result else { throw CodexAppServerError.invalidResponse }
+        return result
     }
 }

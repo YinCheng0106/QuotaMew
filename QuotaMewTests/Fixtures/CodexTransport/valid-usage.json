@@ -1,0 +1,8 @@
+{
+  "summary": { "lifetimeTokens": 4200, "peakDailyTokens": 2100, "currentStreakDays": null },
+  "dailyUsageBuckets": [
+    { "startDate": "2026-01-02", "tokens": 2100 },
+    { "startDate": "2026-01-03", "tokens": 0 }
+  ],
+  "threadUsage": null
+}

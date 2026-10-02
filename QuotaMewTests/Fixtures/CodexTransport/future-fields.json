@@ -1,0 +1,8 @@
+{
+  "summary": { "futureMetric": "synthetic-private-sentinel" },
+  "dailyUsageBuckets": [
+    { "startDate": "2026-01-02", "tokens": 123, "future": { "private": "synthetic-private-sentinel" } }
+  ],
+  "threadUsage": { "futurePrivate": "synthetic-private-sentinel" },
+  "futureVersion": 999
+}
