@@ -120,7 +120,7 @@ private struct ActivityReportView: View {
                     }
                 }
                 .accessibilityElement(children: .combine)
-                ActivityTrendView(points: presentation.points)
+                ActivityTrendView(points: presentation.points, period: presentation.period)
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel(presentation.summaryAccessibilityText)
                 DisclosureGroup("Reported dates") {
@@ -147,32 +147,56 @@ private struct ActivityReportView: View {
 
 private struct ActivityTrendView: View {
     let points: [ActivityPointPresentation]
+    let period: ActivityPeriod
+    @Environment(\.locale) private var locale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Chart(points) { point in
-                switch point.mark {
-                case .positive:
-                    BarMark(x: .value("Source date", point.sourceDate),
-                            y: .value("Reported tokens", point.reportedTokens!))
-                        .foregroundStyle(Color.accentColor)
-                case .zero:
-                    PointMark(x: .value("Source date", point.sourceDate), y: .value("Reported zero", 0))
-                        .symbol(.circle).symbolSize(40).foregroundStyle(Color.primary)
-                case .missing:
-                    // The marker locates a missing date, not a numerical zero bucket.
-                    PointMark(x: .value("Source date", point.sourceDate), y: .value("Not reported", 0))
-                        .symbol(.cross).symbolSize(40).foregroundStyle(Color.secondary)
+            GeometryReader { geometry in
+                let ticks = ActivityChartAxisPolicy.ticks(
+                    for: points, period: period, availableWidth: geometry.size.width
+                )
+                Chart(points) { point in
+                    switch point.mark {
+                    case .positive:
+                        BarMark(x: .value("Source date", point.sourceDate),
+                                y: .value("Reported tokens", point.reportedTokens!))
+                            .foregroundStyle(Color.accentColor)
+                    case .zero:
+                        PointMark(x: .value("Source date", point.sourceDate), y: .value("Reported zero", 0))
+                            .symbol(.circle).symbolSize(40).foregroundStyle(Color.primary)
+                    case .missing:
+                        // The marker locates a missing date, not a numerical zero bucket.
+                        PointMark(x: .value("Source date", point.sourceDate), y: .value("Not reported", 0))
+                            .symbol(.cross).symbolSize(40).foregroundStyle(Color.secondary)
+                    }
                 }
-            }
-            .chartXScale(domain: points.map(\.sourceDate))
-            .chartXAxis {
-                AxisMarks(values: [points.first?.sourceDate, points.last?.sourceDate].compactMap { $0 }) {
-                    AxisValueLabel()
+                .chartXScale(domain: points.map(\.sourceDate))
+                .chartXAxis {
+                    AxisMarks(values: ticks.map(\.sourceDate)) { value in
+                        AxisValueLabel {
+                            if let sourceDate = value.as(String.self),
+                               let tick = ticks.first(where: { $0.sourceDate == sourceDate }) {
+                                Text(verbatim: tick.label)
+                            }
+                        }
+                    }
                 }
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel {
+                            if let amount = value.as(Double.self), amount.isFinite,
+                               amount >= 0, amount <= Double(Int64.max) {
+                                Text(verbatim: ActivityFormatting.compact(Int64(amount.rounded()), locale: locale))
+                            }
+                        }
+                    }
+                }
+                .chartYScale(domain: .automatic(includesZero: true))
             }
-            .chartYScale(domain: .automatic(includesZero: true))
-            .frame(height: 160)
+            .frame(height: 180)
             .accessibilityHidden(true) // Exact, localized semantics live in the summary and date list.
             Text("Bars: reported activity · ●: reported zero · +: not reported")
                 .font(.caption).foregroundStyle(.secondary)

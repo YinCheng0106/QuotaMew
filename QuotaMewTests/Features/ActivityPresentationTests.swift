@@ -18,6 +18,60 @@ final class ActivityPresentationTests: XCTestCase {
         XCTAssertEqual(ActivityFormatting.compact(42_600, locale: chinese), "4.3萬")
     }
 
+    func testChartAxisFormattingIsCompactAndUsesExistingActivityNumberFormatter() throws {
+        for locale in [english, chinese] {
+            for value in [25_000_000, 50_000_000, 75_000_000, 100_000_000] {
+                let formatted = ActivityFormatting.compact(Int64(value), locale: locale)
+                XCTAssertFalse(formatted.contains("E"), "Unexpected scientific notation: \(formatted)")
+                XCTAssertEqual(formatted, Int64(value).formatted(
+                    .number.notation(.compactName).precision(.fractionLength(0...1)).locale(locale)
+                ))
+            }
+        }
+        XCTAssertEqual(ActivityFormatting.compact(75_000_000, locale: english), "75M")
+    }
+
+    func testChartDateFormattingAcrossMonthAndYearBoundaries() throws {
+        XCTAssertEqual(ActivityFormatting.chartDate(try ProviderCalendarDate("2026-09-26")), "9/26")
+        XCTAssertEqual(ActivityFormatting.chartDate(try ProviderCalendarDate("2026-10-01")), "10/1")
+        XCTAssertEqual(ActivityFormatting.chartDate(try ProviderCalendarDate("2026-12-31")), "12/31")
+        XCTAssertEqual(ActivityFormatting.chartDate(try ProviderCalendarDate("2027-01-01")), "1/1")
+    }
+
+    func testSevenDayChartAxisKeepsDailyDataAndCompactChronologicalLabels() throws {
+        let report = ActivityPresentation(projection: try fixture(), period: .sevenDays, locale: english)
+        let ticks = ActivityChartAxisPolicy.ticks(for: report.points, period: .sevenDays, availableWidth: 372)
+        XCTAssertEqual(report.points.count, 7)
+        XCTAssertEqual(ticks.map(\.label), ["9/26", "9/27", "9/28", "9/29", "9/30", "10/1", "10/2"])
+        XCTAssertEqual(ticks.map(\.sourceDate), ticks.map(\.sourceDate).sorted())
+        XCTAssertEqual(Set(ticks.map(\.label)).count, ticks.count)
+    }
+
+    func testThirtyDayChartAxisUsesFiveEvenlySpacedTicksWithoutDroppingDailyMarks() throws {
+        let report = ActivityPresentation(projection: try fixture(), period: .thirtyDays, locale: english)
+        let originalPoints = report.points
+        let ticks = ActivityChartAxisPolicy.ticks(for: report.points, period: .thirtyDays, availableWidth: 372)
+        XCTAssertEqual(report.points.count, 30)
+        XCTAssertEqual(ticks.count, 5)
+        XCTAssertEqual(ticks.first?.sourceDate, report.points.first?.sourceDate)
+        XCTAssertEqual(ticks.last?.sourceDate, report.points.last?.sourceDate)
+        XCTAssertEqual(ticks.map(\.sourceDate), ticks.map(\.sourceDate).sorted())
+        XCTAssertEqual(Set(ticks.map(\.label)).count, ticks.count)
+        XCTAssertEqual(report.points, originalPoints)
+        XCTAssertEqual(report.points.filter { $0.mark == .missing }.count, 28)
+        XCTAssertEqual(report.points.filter { $0.mark == .zero }.count, 1)
+    }
+
+    func testSevenDayChartAxisReducesTicksOnlyBelowMinimumSpacing() throws {
+        let report = ActivityPresentation(projection: try fixture(), period: .sevenDays, locale: english)
+        let ticks = ActivityChartAxisPolicy.ticks(for: report.points, period: .sevenDays, availableWidth: 240)
+        XCTAssertLessThan(ticks.count, report.points.count)
+        XCTAssertEqual(ticks.first?.sourceDate, report.points.first?.sourceDate)
+        XCTAssertEqual(ticks.last?.sourceDate, report.points.last?.sourceDate)
+        XCTAssertEqual(ticks.map(\.sourceDate), ticks.map(\.sourceDate).sorted())
+        XCTAssertEqual(report.points.count, 7)
+    }
+
     func testCoverageLocalizationForCompleteAndPartialWindows() {
         for (reported, expected) in [(7, 7), (4, 7), (30, 30), (28, 30)] {
             let coverage = ActivityCoverage(reportedDays: reported, expectedDays: expected)

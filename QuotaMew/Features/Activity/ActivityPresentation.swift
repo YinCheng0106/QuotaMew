@@ -26,6 +26,12 @@ enum ActivityFormatting {
     // Source dates are calendar values, never local midnight instants.
     static func sourceDate(_ value: ProviderCalendarDate) -> String { value.rawValue }
 
+    static func chartDate(_ value: ProviderCalendarDate) -> String {
+        let month = value.rawValue.dropFirst(5).prefix(2)
+        let day = value.rawValue.suffix(2)
+        return "\(Int(month) ?? 0)/\(Int(day) ?? 0)"
+    }
+
     static func coverage(_ value: ActivityCoverage, locale: Locale) -> String {
         AppLocalization.string("activity.coverage \(value.reportedDays) \(value.expectedDays)", locale: locale)
     }
@@ -38,6 +44,39 @@ enum ActivityFormatting {
         let timestamp = date.formatted(.dateTime.year().month().day().hour().minute().locale(locale))
         return AppLocalization.string("activity.fetched \(timestamp)", locale: locale)
     }
+}
+
+enum ActivityChartAxisPolicy {
+    private static let minimumTickSpacing = 48.0
+    private static let thirtyDayTickSpacing = 64.0
+
+    /// Selects visible labels only. Callers keep every point in the chart and accessibility dataset.
+    static func ticks(for points: [ActivityPointPresentation], period: ActivityPeriod,
+                      availableWidth: Double) -> [ActivityChartAxisTick] {
+        guard !points.isEmpty else { return [] }
+        let spacing = period == .thirtyDays ? thirtyDayTickSpacing : minimumTickSpacing
+        let preferredCount = period == .thirtyDays ? 5 : points.count
+        let capacity = max(2, Int(max(0, availableWidth) / spacing))
+        let tickCount = min(points.count, preferredCount, capacity)
+        guard tickCount > 1 else {
+            return [ActivityChartAxisTick(sourceDate: points[0].sourceDate, label: compactLabel(points[0]))]
+        }
+
+        let indices = (0..<tickCount).map { tick in
+            Int((Double(tick) * Double(points.count - 1) / Double(tickCount - 1)).rounded())
+        }
+        return indices.map { ActivityChartAxisTick(sourceDate: points[$0].sourceDate, label: compactLabel(points[$0])) }
+    }
+
+    private static func compactLabel(_ point: ActivityPointPresentation) -> String {
+        guard let date = try? ProviderCalendarDate(point.sourceDate) else { return point.sourceDate }
+        return ActivityFormatting.chartDate(date)
+    }
+}
+
+struct ActivityChartAxisTick: Equatable {
+    let sourceDate: String
+    let label: String
 }
 
 struct ActivityPointPresentation: Identifiable, Equatable {
@@ -68,6 +107,7 @@ struct ActivityPointPresentation: Identifiable, Equatable {
 
 /// Bounded, deterministic presentation shared by the view and semantic tests.
 struct ActivityPresentation {
+    let period: ActivityPeriod
     let metricLabel: String
     let metricText: String
     let metricAccessibilityValue: String
@@ -80,6 +120,7 @@ struct ActivityPresentation {
     let points: [ActivityPointPresentation]
 
     init(projection: ActivityProjection, period: ActivityPeriod, locale: Locale) {
+        self.period = period
         let value: Int64
         switch period {
         case .latest:
