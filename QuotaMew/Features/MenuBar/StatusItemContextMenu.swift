@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 final class SettingsSceneRoute {
     var open: (@MainActor () -> Void)?
+    var openActivity: (@MainActor () -> Void)?
 }
 
 @MainActor
@@ -12,20 +13,24 @@ final class StatusItemContextMenu: NSObject {
     let menu = NSMenu()
     private let refresh: @MainActor () -> Void
     private let openSettings: @MainActor () -> Void
+    private let openActivity: @MainActor () -> Void
     private let quit: @MainActor () -> Void
 
     init(
         refresh: @escaping @MainActor () -> Void,
         openSettings: @escaping @MainActor () -> Void,
+        openActivity: @escaping @MainActor () -> Void = {},
         quit: @escaping @MainActor () -> Void,
         locale: Locale = .autoupdatingCurrent
     ) {
         self.refresh = refresh
         self.openSettings = openSettings
+        self.openActivity = openActivity
         self.quit = quit
         super.init()
         menu.autoenablesItems = false
         add("Refresh Now", action: #selector(refreshNow), locale: locale)
+        add("Account Activity…", action: #selector(showActivity), locale: locale)
         add("Settings…", action: #selector(showSettings), locale: locale)
         menu.addItem(.separator())
         add("Quit QuotaMew", action: #selector(quitApplication), keyEquivalent: "q", locale: locale)
@@ -48,6 +53,7 @@ final class StatusItemContextMenu: NSObject {
 
     @objc private func refreshNow() { refresh() }
     @objc private func showSettings() { openSettings() }
+    @objc private func showActivity() { openActivity() }
     @objc private func quitApplication() { quit() }
 
     func teardown() {

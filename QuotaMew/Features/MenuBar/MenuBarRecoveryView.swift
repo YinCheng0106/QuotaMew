@@ -98,6 +98,7 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
     let settingsSceneRoute = SettingsSceneRoute()
     private var appModel: AppModel?
     private var settingsModel: SettingsModel?
+    private(set) var activityWindowController: ActivityWindowController?
     private(set) var statusItemController: (any StatusItemControllerLifecycle)?
     private var recoveryWindowController: NSWindowController?
     private var onboardingPresenter: (any OnboardingPresentationHandling)?
@@ -113,6 +114,9 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
                     openSettings: {
                         NSApplication.shared.activate()
                         settingsSceneRoute.open?()
+                    },
+                    openActivity: {
+                        settingsSceneRoute.openActivity?()
                     }
                 )
             },
@@ -139,9 +143,20 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
         super.init()
     }
 
-    func configure(appModel: AppModel, settingsModel: SettingsModel) {
+    func configure(appModel: AppModel, settingsModel: SettingsModel, activityModel: ActivityModel? = nil) {
         self.appModel = appModel
         self.settingsModel = settingsModel
+        if let activityModel, activityWindowController == nil {
+            activityWindowController = ActivityWindowController(
+                model: activityModel,
+                openSettings: { [weak self] in
+                    self?.activationController.activate()
+                    self?.settingsSceneRoute.open?()
+                },
+                activate: { [weak self] in self?.activationController.activate() }
+            )
+            settingsSceneRoute.openActivity = { [weak self] in self?.activityWindowController?.show() }
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -152,6 +167,9 @@ final class QuotaMewApplicationDelegate: NSObject, NSApplicationDelegate, NSWind
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        settingsSceneRoute.openActivity = nil
+        activityWindowController?.teardown()
+        activityWindowController = nil
         onboardingPresenter?.teardown()
         onboardingPresenter = nil
         recoveryWindowController?.window?.delegate = nil

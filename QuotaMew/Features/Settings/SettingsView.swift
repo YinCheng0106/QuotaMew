@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     let model: SettingsModel
     let appModel: AppModel
+    let activityModel: ActivityModel
     let showOnboarding: @MainActor () -> Void
 
     var body: some View {
@@ -13,7 +14,7 @@ struct SettingsView: View {
                 showOnboarding: showOnboarding
             )
                 .tabItem { Label("General", systemImage: "gearshape") }
-            ProviderSettingsPage(model: model)
+            ProviderSettingsPage(model: model, activityModel: activityModel)
                 .tabItem { Label("Providers", systemImage: "rectangle.3.group") }
             NotificationSettingsPage(model: model, appModel: appModel)
                 .tabItem { Label("Notifications", systemImage: "bell") }
@@ -182,6 +183,7 @@ private struct GeneralSettingsPage: View {
 
 private struct ProviderSettingsPage: View {
     let model: SettingsModel
+    let activityModel: ActivityModel
 
     var body: some View {
         Form {
@@ -193,6 +195,9 @@ private struct ProviderSettingsPage: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Section("Codex Account Activity") {
+                ActivityConsentView(model: activityModel, store: model.store)
+            }
         }
         .formStyle(.grouped)
         .padding()
@@ -200,6 +205,29 @@ private struct ProviderSettingsPage: View {
 
     private func providerBinding(_ providerID: ProviderID) -> Binding<Bool> {
         Binding(get: { model.store.isProviderEnabled(providerID) }, set: { model.setProvider(providerID, enabled: $0) })
+    }
+}
+
+/// Uses the runtime's model directly; consent remains the service's SettingsStore Boolean.
+struct ActivityConsentView: View {
+    let model: ActivityModel
+    let store: SettingsStore
+
+    var body: some View {
+        Toggle("Account Activity", isOn: Binding(
+            get: { store.isCodexAccountActivityEnabled },
+            set: { enabled in Task { await model.setEnabled(enabled) } }
+        ))
+        .disabled(!store.isCodexEnabled)
+        .accessibilityHint("Fetch activity only when you open or refresh the Account Activity window.")
+        Text("Fetch provider-reported Codex token activity when you open or refresh the Account Activity window.")
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        Text("QuotaMew does not store this activity history on disk and does not read prompts, threads, source code, or credentials for this feature.")
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        Text("Activity values are cleared when QuotaMew quits.")
+            .font(.caption).foregroundStyle(.secondary)
     }
 }
 
@@ -310,6 +338,10 @@ private struct DiagnosticsSection: View {
             launchAtLoginController: PreviewLaunchAtLoginController()
         ),
         appModel: appModel,
+        activityModel: ActivityModel(
+            service: ActivityService(sources: [], store: ActivitySnapshotStore(), consent: { _ in false }),
+            providerID: .codex, initiallyEnabled: false
+        ),
         showOnboarding: {}
     )
 }

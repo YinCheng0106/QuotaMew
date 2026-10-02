@@ -68,6 +68,20 @@ ResetEvent，保留不可變的原始來源 URL 與 source name
 
 UI 只接收正規化後的 snapshot；不解析 provider payload、不啟動指令，也不讀取檔案。
 
+### v0.3 M4 — Codex Account Activity presentation（2026-10-02）
+
+活動呈現維持獨立路徑：共享 `CodexAppServerClient` → `CodexTokenActivitySource` → `ActivityService`／memory-only `ActivitySnapshotStore` → `ActivityModel` → `ActivityWindowView`／`ActivityPresentation`。`AppDependencies.Runtime` 組裝唯一 client、service、store、model；`AppModel`、Dashboard、選單列數值與 quota scheduler 不持有或查詢活動資料。
+
+`QuotaMewApplicationDelegate` 保留一個 `ActivityWindowController`，透過現有右鍵選單的 **Account Activity…／帳號活動…** action 開啟。使用 `NSWindow` + `NSHostingController`，既有視窗再次開啟只置前；關閉釋放 presentation、保留同一 app session 的 memory snapshot，重新開啟重建 view，預設 Latest。視窗可調整大小，預設 content 560×680、最小 420×460，不更改 activation policy 或建立第二個 NSStatusItem。左鍵仍開啟 Dashboard，Refresh Now 仍只刷新額度。
+
+Settings → Providers → Codex Account Activity 的 `ActivityConsentView` 直接讀取共享 `SettingsStore` 同意偏好，setter 只經共享 `ActivityModel.setEnabled` → service → store。只有 `activity.codex.account.enabled` Bool 新持久化，沒有重複 observable consent Boolean。預設關閉，啟用只變為 idle，不自動擷取；停用立即清除 observable values，取消／invalidate 活動工作與 memory snapshot，generation fence 阻止晚到結果復活。Codex provider 關閉也同步清畫面，活動同意偏好保留；重新啟用 provider 不擷取活動。
+
+活動只有 on-demand requests：enabled + idle 開啟視窗最多一次；available、empty、failed、unavailable、unsupported 重新開啟不重抓，使用者可明確 Refresh／Retry。原生 toolbar 的 Refresh 與 Command-R 只呼叫共享 ActivityModel。App 啟動、Dashboard／Settings 開啟、同意切換與 quota background scheduling 都不新增活動 RPC；無 age-based polling 或 timer。
+
+Latest 表示最新來源日期；7D／30D 沿用 M3 的 source calendar range，以「已回報總量」搭配日期涵蓋與缺日文案。Swift Charts 最多 7／30 點：正值為長條，explicit zero 為圓點，missing 為叉號日期標記，不能把 missing 解釋成零。逐日 disclosure 提供 exact localized integer 與完整 VoiceOver 文案，圖表隱藏於 accessibility tree，另以 summary、coverage 與逐日資料提供語意。來源日期保持驗證後的 YYYY-MM-DD，不建立 local-midnight Date；Fetched 僅代表 QuotaMew 擷取時間。數值不代表精確帳務、API 成本、訂閱額度消耗或完整歷史。
+
+英文／繁體中文由既有 String Catalog 提供，使用 semantic colors，合成 previews 不啟動 provider。自動與 live 驗證、人工外觀／VoiceOver 待驗收狀態見 [`docs/V0_3_DAILY_USAGE_ARCHITECTURE.md`](docs/V0_3_DAILY_USAGE_ARCHITECTURE.md#23-m4-介面與驗收)。
+
 ### v0.2 Product Polish（2026-09-07，COMPLETE，尚未發行）
 
 額度名稱只有一個來源：`UsageWindowPresentation`。精確 duration 18,000 秒對應 `5-hour`／`5 小時`，604,800 秒對應 `Weekly`／`每週`，未知／缺少／無效 duration 使用通用名稱；不由 array position、primary/secondary 或倒數推論，也不把 raw provider label 顯示給使用者。Dashboard row、VoiceOver header 及 approaching/completed notification 文案都共用此 formatter；`UsagePresentation` 繼續只負責 Remaining／Used 百分比。Domain ID、label、duration、reset/cycle metadata 保持原值；`LocalResetDetector` 不參與本地化。

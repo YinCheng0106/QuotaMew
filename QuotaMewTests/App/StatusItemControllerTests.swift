@@ -11,12 +11,14 @@ final class StatusItemControllerTests: XCTestCase {
         let popover = TestStatusItemPopover()
         var creations = 0
         var settingsCount = 0
+        var activityCount = 0
         var quitCount = 0
         let controller = StatusItemController(
             appModel: fixture.appModel, settingsModel: fixture.settingsModel,
             statusItemFactory: { creations += 1; return item },
             popoverFactory: { _, _ in popover },
             openSettings: { settingsCount += 1 },
+            openActivity: { activityCount += 1 },
             terminateApplication: { quitCount += 1 }
         )
         defer { controller.teardown() }
@@ -29,11 +31,14 @@ final class StatusItemControllerTests: XCTestCase {
         for _ in 0..<100 { item.onSecondaryActivate?() }
         XCTAssertEqual(item.shownMenus.count, 101)
         XCTAssertTrue(item.shownMenus.allSatisfy { $0 === menu })
-        XCTAssertEqual(menu.items.count, 4)
+        XCTAssertEqual(menu.items.count, 5)
         XCTAssertEqual(creations, 1)
         XCTAssertEqual(item.visibilityObservationCount, 1)
         menu.performActionForItem(at: 1)
-        menu.performActionForItem(at: 3)
+        menu.performActionForItem(at: 1)
+        menu.performActionForItem(at: 2)
+        menu.performActionForItem(at: 4)
+        XCTAssertEqual(activityCount, 2)
         XCTAssertEqual(settingsCount, 1)
         XCTAssertEqual(quitCount, 1)
         XCTAssertTrue(fixture.store.isMenuBarItemRequested)
@@ -59,20 +64,21 @@ final class StatusItemControllerTests: XCTestCase {
 
     func testNativeMenuTitlesShortcutsAndActionsInBothLanguages() {
         for (locale, titles) in [
-            (Locale(identifier: "en"), ["Refresh Now", "Settings…", "", "Quit QuotaMew"]),
-            (Locale(identifier: "zh-Hant-TW"), ["立即重新整理", "設定…", "", "退出 QuotaMew"]),
+            (Locale(identifier: "en"), ["Refresh Now", "Account Activity…", "Settings…", "", "Quit QuotaMew"]),
+            (Locale(identifier: "zh-Hant-TW"), ["立即重新整理", "帳號活動…", "設定…", "", "退出 QuotaMew"]),
         ] {
-            var calls = [0, 0, 0]
+            var calls = [0, 0, 0, 0]
             let context = StatusItemContextMenu(
                 refresh: { calls[0] += 1 }, openSettings: { calls[1] += 1 },
+                openActivity: { calls[3] += 1 },
                 quit: { calls[2] += 1 }, locale: locale
             )
             XCTAssertEqual(context.menu.items.map(\.title), titles)
-            XCTAssertTrue(context.menu.items[2].isSeparatorItem)
-            XCTAssertEqual(context.menu.items.map(\.keyEquivalent), ["", "", "", "q"])
-            XCTAssertEqual(context.menu.items[3].keyEquivalentModifierMask, .command)
-            for index in [0, 1, 3] { context.menu.performActionForItem(at: index) }
-            XCTAssertEqual(calls, [1, 1, 1])
+            XCTAssertTrue(context.menu.items[3].isSeparatorItem)
+            XCTAssertEqual(context.menu.items.map(\.keyEquivalent), ["", "", "", "", "q"])
+            XCTAssertEqual(context.menu.items[4].keyEquivalentModifierMask, .command)
+            for index in [0, 1, 2, 4] { context.menu.performActionForItem(at: index) }
+            XCTAssertEqual(calls, [1, 1, 1, 1])
             context.teardown()
         }
     }

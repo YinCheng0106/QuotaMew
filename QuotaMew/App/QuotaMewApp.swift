@@ -12,7 +12,8 @@ struct QuotaMewApp: App {
         _runtime = State(initialValue: runtime)
         applicationDelegate.configure(
             appModel: runtime.appModel,
-            settingsModel: runtime.settingsModel
+            settingsModel: runtime.settingsModel,
+            activityModel: runtime.activityModel
         )
     }
 
@@ -22,6 +23,7 @@ struct QuotaMewApp: App {
             SettingsView(
                 model: runtime.settingsModel,
                 appModel: runtime.appModel,
+                activityModel: runtime.activityModel,
                 showOnboarding: { applicationDelegate.showOnboardingAgain() }
             )
         }

@@ -111,6 +111,7 @@ final class StatusItemController: StatusItemControllerLifecycle {
             )
         },
         openSettings: @escaping @MainActor () -> Void = {},
+        openActivity: @escaping @MainActor () -> Void = {},
         terminateApplication: @escaping @MainActor () -> Void = {
             NSApplication.shared.terminate(nil)
         }
@@ -124,6 +125,7 @@ final class StatusItemController: StatusItemControllerLifecycle {
         contextMenu = StatusItemContextMenu(
             refresh: { appModel.refreshManually() },
             openSettings: openSettings,
+            openActivity: openActivity,
             quit: terminateApplication
         )
 

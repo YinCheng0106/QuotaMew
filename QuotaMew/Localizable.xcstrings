@@ -1,6 +1,737 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Refresh" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新整理"
+          }
+        }
+      }
+    },
+    "Retry" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再試一次"
+          }
+        }
+      }
+    },
+    "Activity values are cleared when QuotaMew quits." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity values are cleared when QuotaMew quits."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出 QuotaMew 後，活動數值就會清除。"
+          }
+        }
+      }
+    },
+    "Codex Account Activity" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex Account Activity"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex 帳號活動"
+          }
+        }
+      }
+    },
+    "Account Activity" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account Activity"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帳號活動"
+          }
+        }
+      }
+    },
+    "Account Activity…" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account Activity…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帳號活動…"
+          }
+        }
+      }
+    },
+    "Latest" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新"
+          }
+        }
+      }
+    },
+    "Latest reported" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest reported"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新回報"
+          }
+        }
+      }
+    },
+    "Reported total" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported total"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已回報總量"
+          }
+        }
+      }
+    },
+    "Coverage" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Coverage"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "資料涵蓋"
+          }
+        }
+      }
+    },
+    "Not reported" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not reported"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未回報"
+          }
+        }
+      }
+    },
+    "Activity period" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity period"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活動期間"
+          }
+        }
+      }
+    },
+    "Provider-reported token activity" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Provider-reported token activity"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "來源回報 Token 活動"
+          }
+        }
+      }
+    },
+    "Sample activity" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sample activity"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "範例活動"
+          }
+        }
+      }
+    },
+    "Based on dates reported by Codex." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Based on dates reported by Codex."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "依 Codex 回報的日期呈現。"
+          }
+        }
+      }
+    },
+    "Activity summary" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity summary"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活動摘要"
+          }
+        }
+      }
+    },
+    "Reported dates" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported dates"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "逐日回報資料"
+          }
+        }
+      }
+    },
+    "About these values" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About these values"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關於這些數值"
+          }
+        }
+      }
+    },
+    "Refresh Account Activity" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Account Activity"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新整理帳號活動"
+          }
+        }
+      }
+    },
+    "Account Activity is opt-in" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account Activity is opt-in"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "帳號活動需自行啟用"
+          }
+        }
+      }
+    },
+    "Enable Account Activity in Settings to fetch provider-reported Codex token activity. Values stay in memory for this app session." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable Account Activity in Settings to fetch provider-reported Codex token activity. Values stay in memory for this app session."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在設定中啟用帳號活動，即可擷取 Codex 回報的 Token 活動。數值只會保留在本次 App 執行期間的記憶體中。"
+          }
+        }
+      }
+    },
+    "Ready to fetch Account Activity" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to fetch Account Activity"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可以擷取帳號活動"
+          }
+        }
+      }
+    },
+    "Open or refresh this window to request activity from Codex." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open or refresh this window to request activity from Codex."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟或重新整理此視窗，即可向 Codex 要求活動資料。"
+          }
+        }
+      }
+    },
+    "Fetching Account Activity…" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetching Account Activity…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在擷取帳號活動…"
+          }
+        }
+      }
+    },
+    "Requesting provider-reported token activity from Codex." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Requesting provider-reported token activity from Codex."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在向 Codex 要求來源回報的 Token 活動。"
+          }
+        }
+      }
+    },
+    "No reported activity dates" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No reported activity dates"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有已回報的活動日期"
+          }
+        }
+      }
+    },
+    "Codex did not report daily activity for this account." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex did not report daily activity for this account."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex 未回報此帳號的每日活動資料。"
+          }
+        }
+      }
+    },
+    "Account Activity isn't available with this Codex runtime." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account Activity isn't available with this Codex runtime."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前的 Codex 執行環境不支援帳號活動。"
+          }
+        }
+      }
+    },
+    "Quota monitoring is unaffected." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quota monitoring is unaffected."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "額度監看不受影響。"
+          }
+        }
+      }
+    },
+    "Codex activity is currently unavailable." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex activity is currently unavailable."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前無法取得 Codex 活動。"
+          }
+        }
+      }
+    },
+    "Try refreshing when Codex is available. Quota monitoring is unaffected." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try refreshing when Codex is available. Quota monitoring is unaffected."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請在 Codex 可用時重新整理。額度監看不受影響。"
+          }
+        }
+      }
+    },
+    "Couldn't refresh Account Activity." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't refresh Account Activity."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法重新整理帳號活動。"
+          }
+        }
+      }
+    },
+    "Try again. Quota monitoring is unaffected." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try again. Quota monitoring is unaffected."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請再試一次。額度監看不受影響。"
+          }
+        }
+      }
+    },
+    "Fetch activity only when you open or refresh the Account Activity window." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch activity only when you open or refresh the Account Activity window."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅在開啟或重新整理帳號活動視窗時擷取資料。"
+          }
+        }
+      }
+    },
+    "Fetch provider-reported Codex token activity when you open or refresh the Account Activity window." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch provider-reported Codex token activity when you open or refresh the Account Activity window."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟或重新整理帳號活動視窗時，擷取 Codex 回報的 Token 活動。"
+          }
+        }
+      }
+    },
+    "QuotaMew does not store this activity history on disk and does not read prompts, threads, source code, or credentials for this feature." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QuotaMew does not store this activity history on disk and does not read prompts, threads, source code, or credentials for this feature."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "QuotaMew 不會將此活動紀錄儲存到磁碟，也不會為此功能讀取提示詞、對話串、原始碼或憑證。"
+          }
+        }
+      }
+    },
+    "Activity values are reported by Codex and may not represent exact billing or subscription quota usage. Dates use the source-provided calendar buckets; the latest date is not necessarily your local today. History may be incomplete." : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity values are reported by Codex and may not represent exact billing or subscription quota usage. Dates use the source-provided calendar buckets; the latest date is not necessarily your local today. History may be incomplete."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活動數值由 Codex 回報，不一定代表精確的計費或訂閱額度用量。日期依來源提供的每日資料分組，最新日期不一定是你所在地的今天。活動紀錄可能不完整。"
+          }
+        }
+      }
+    },
+    "Bars: reported activity · ●: reported zero · +: not reported" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bars: reported activity · ●: reported zero · +: not reported"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "長條：已回報活動 · ●：明確回報為零 · +：未回報"
+          }
+        }
+      }
+    },
+    "activity.coverage %lld %lld" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld of %2$lld dates reported"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已回報 %1$lld／%2$lld 個日期"
+          }
+        }
+      }
+    },
+    "activity.missing %lld" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld dates were not reported by Codex"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex 未回報 %lld 個日期"
+          }
+        }
+      }
+    },
+    "activity.fetched %@" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetched %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "擷取時間：%@"
+          }
+        }
+      }
+    },
+    "activity.date.tokens %@ %@" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, %2$@ provider-reported tokens"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@，來源回報 %2$@ 個 Token"
+          }
+        }
+      }
+    },
+    "activity.date.missing %@" : {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, not reported"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@，未回報"
+          }
+        }
+      }
+    },
     "—" : {
 
     },

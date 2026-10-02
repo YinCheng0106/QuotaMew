@@ -70,16 +70,18 @@ enum AppDependencies {
             preferences: settingsStore,
             notificationService: notificationService
         )
+        let activityModel = ActivityModel(service: activityService, providerID: .codex,
+                                          initiallyEnabled: settingsStore.isActivityEnabled(.codex))
         return Runtime(
             appModel: appModel,
             activityService: activityService,
             activityStore: activityStore,
-            activityModel: ActivityModel(service: activityService, providerID: .codex,
-                                         initiallyEnabled: settingsStore.isActivityEnabled(.codex)),
+            activityModel: activityModel,
             settingsModel: SettingsModel(
                 store: settingsStore,
                 appModel: appModel,
-                notificationService: notificationService
+                notificationService: notificationService,
+                activityModel: activityModel
             )
         )
     }

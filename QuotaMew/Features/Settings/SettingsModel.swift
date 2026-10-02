@@ -33,6 +33,7 @@ final class SettingsModel {
     private(set) var launchAtLoginUpdateFailed = false
 
     private let appModel: AppModel
+    private let activityModel: ActivityModel?
     private let notificationService: any NotificationServicing
     private let launchAtLoginController: any LaunchAtLoginControlling
     private let diagnosticClipboard: any DiagnosticClipboardWriting
@@ -41,6 +42,7 @@ final class SettingsModel {
         store: SettingsStore,
         appModel: AppModel,
         notificationService: any NotificationServicing,
+        activityModel: ActivityModel? = nil,
         launchAtLoginController: any LaunchAtLoginControlling = LaunchAtLoginController(),
         diagnosticClipboard: any DiagnosticClipboardWriting = SystemDiagnosticClipboard()
     ) {
@@ -50,6 +52,7 @@ final class SettingsModel {
         menuBarQuotaSelection = store.menuBarQuotaSelection
         pinnedProviderRawValue = store.pinnedProviderRawValue
         self.appModel = appModel
+        self.activityModel = activityModel
         self.notificationService = notificationService
         self.launchAtLoginController = launchAtLoginController
         self.diagnosticClipboard = diagnosticClipboard
@@ -148,6 +151,7 @@ final class SettingsModel {
             isEnabled: enabled
         )
         store.setProvider(providerID, enabled: enabled)
+        if providerID == .codex { activityModel?.providerEligibilityDidChange() }
         appModel.applyProviderEligibilityChange(providerID, isEnabled: enabled)
 
         if enabled {

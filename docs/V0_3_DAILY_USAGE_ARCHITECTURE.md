@@ -391,3 +391,96 @@ Model 以 enum atomic publication 提供八種狀態；只依 service／query，
 沒有 manual UI、效能／RSS／CPU、通知送達、簽章／notarization／distribution 驗證；M3 不加入可見介面，M4 尚未開始。ROADMAP、README、Fumadocs、release metadata 與 v0.2.0-rc.2 history 未變更。
 
 **FINAL STATUS：READY TO IMPLEMENT v0.3 M4。** 這是 M3 implementation checkpoint，仍不是 v0.3 release-ready 承諾。
+
+## 23. M4 介面與驗收
+
+### 實作範圍與 ownership
+
+M4 加入第一個可見的 **Codex Account Activity／Codex 帳號活動** 介面，保持 `CodexTokenActivitySource → ActivityService → ActivitySnapshotStore → ActivityModel → ActivityProjection` 架構。Production `Runtime` 持有唯一活動 model/service/store，quota 與 activity 共用同一個 Codex client、child、reader；不將 Activity state 加入 AppModel，也不讓 Dashboard 解析 snapshots。
+
+新增 `ActivityPresentation.swift`（pure formatting／localized semantics）、`ActivityWindowView.swift`（SwiftUI／Charts）、`ActivityWindowController.swift`（native window ownership）與 `ActivityWindowPreviews.swift`（synthetic fixtures only）。Application delegate retains controller，既有 `SettingsSceneRoute` action container 增加 `openActivity` callback，右鍵選單順序為 Refresh Now → Account Activity… → Settings… → separator → Quit QuotaMew。維持唯一 NSStatusItem，左鍵 Dashboard、quota Refresh Now、Settings route、Quit／teardown 均維持原路徑。
+
+視窗使用 NSWindow + NSHostingController、標準 title bar 與 native Refresh toolbar。預設 content 560×680、最小 420×460，可縮放／最小化，重複開啟同一視窗置前；關閉釋放 hosting content／window reference，重新開啟建立 presentation，仍使用原 ActivityModel。Activity open 不改 activation policy，不新增 permanent Dock icon；與既有 Onboarding／Recovery 的 policy ownership 分開。關閉保留當次記憶體 snapshot，退出／重啟只恢復 consent，沒有 token snapshot restore。
+
+**本節採用 M4 核准的 refresh／close policy，取代上方設計提案的最後 demand 關閉清除、Dashboard 入口與未實作 lifecycle／cooldown 建議。** 不因關閉視窗清除 snapshot，也不新增背景輪詢、account identity reads 或 quota callbacks；更完整 lifecycle/privacy/performance hardening 保留原 M5 範圍。
+
+### Settings 同意與刷新政策
+
+Settings → Providers 新增 Codex Account Activity section，`ActivityConsentView` 的 Binding getter 直接讀共享 SettingsStore 的 Bool，setter 只呼叫共享 `ActivityModel.setEnabled`。無第二份 persisted／observable consent Boolean。Codex provider 關閉時 toggle disabled，原同意偏好仍可保留；SettingsModel 接到同一 ActivityModel，只轉送 provider eligibility invalidation，不持有活動數值。
+
+| 動作／狀態 | 結果 |
+| --- | --- |
+| 全新／既有安裝 | 預設 disabled；開啟視窗顯示簡潔說明與 Open Settings，零活動 I/O |
+| 啟用同意 | 只 persist consent，model = enabled/idle；不擷取 |
+| enabled + idle 明確開啟視窗 | 建立／置前視窗，最多一次 shared model refresh；重疊 open coalesce |
+| available 重新開啟 | 立即顯示當次記憶體資料，不重抓 |
+| failed／unavailable／unsupported／empty 重新開啟 | 不自動重試；在可用狀態提供明確 Refresh／Retry |
+| 手動 Refresh／Command-R | 僅經 ActivityModel.refresh；model/service coalesce，loading 先移除舊值 |
+| 關閉同意 | 立即清除 observable projection；invalidate 活動工作／memory snapshot，拒絕晚到結果；future activity I/O = 0 |
+| 關閉 Codex provider | SettingsModel 同步清畫面，service 重新驗證 provider eligibility；活動同意偏好保留 |
+| 重新啟用 Codex provider | consent 為 true 時 model 回到 idle，無活動 I/O |
+| App launch／Dashboard／Settings／quota scheduler | 不呼叫活動 refresh；既有 quota scheduler 不變 |
+
+Settings 說明指出只在啟用後明確開啟／刷新活動視窗才擷取，不儲存 activity history 到磁碟，退出 App 清除數值；此功能不讀 prompts、threads、source code 或 credentials。不宣稱 Codex runtime 沒有網路通訊，也不加入 iCloud／cloud sync。
+
+### 呈現／accessibility 語意
+
+| 內容 | M4 行為 |
+| --- | --- |
+| period | native segmented Picker：Latest／7D／30D；只影響 presentation，預設 Latest，不持久化、不觸發 I/O |
+| Latest | 最新 provider source date + provider-reported tokens；explicit zero 正常顯示 0，不稱 local Today／Yesterday |
+| 7D／30D | M3 anchor−6／anchor−29 calendar ranges，顯示 **Reported total／已回報總量**、source-date range、reported/expected coverage；partial 不宣稱完整 period total |
+| 正值／零／缺日 | Swift Charts 長條／baseline circle／baseline cross 日期標記；missing 不建立 zero bucket，不計 missing-day average，不插值 |
+| date detail | disclosure 最多 7／30 列，exact localized token integer 或 Not reported，stable source-date identity |
+| chart accessibility | chart visual hidden；本地化 summary 包含 period、range、full total、coverage／missing，逐日 rows 有完整 reported／missing label；不靠顏色區分 |
+| number | 保留 Int64；<1K localized integer，其餘 native compact notation 至多 1 位小數，遵守 locale（例如英文 K／M／B、繁中萬）；metric VoiceOver 為 full integer |
+| source date | 使用驗證後 YYYY-MM-DD 原字串，不建立 Date／timezone／relative-day labels |
+| capture | static localized Fetched／擷取時間，僅表示 QuotaMew capture；不加 timer |
+| state | disabled／idle／loading／available／no reported buckets／unsupported／unavailable／failed 各有純 presentation mapping，不顯示 raw error、method ID 或 provider metadata；failure 不保留舊數值 |
+| keyboard | native period selector、Refresh button／Command-R；逐日與 help disclosure 可用鍵盤；實際閱讀順序仍需人工 VoiceOver |
+| theme／size | 系統 semantic styles；根視圖和 NSWindow 同一 minimum；ScrollView 容納窄高視窗內容 |
+
+String Catalog 補齊英文與臺灣繁體中文，7D／30D 保留語言中立標籤。About these values 清楚說明 provider counters 可能不是精確帳務／訂閱額度，來源日期不一定是本機今天，history 可能不完整。Synthetic previews 包含 disabled、Latest zero、7D zero/missing、30D complete、繁中 dark/minimum width、unsupported、failed，所有 preview source 均為記憶體合成資料，不建立 provider 或 persistence。
+
+### 人工驗收清單（全部待人員確認）
+
+自動 rendering／constraints／keyboard checks 不是人工驗收證明。**不得勾選 PASS，直到實際人員完成。** 使用 App 與上述 synthetic Xcode previews；真實來源不保證有 partial／failed 狀態。
+
+- [ ] English：disabled、loading、Latest、7D、30D；complete／partial／zero／missing；failed／unsupported fixture。
+- [ ] 繁體中文：上述主要狀態、數值／日期／coverage／privacy 文案，確認無截斷或殘留英文 UI。
+- [ ] Light／Dark；default 560×680、minimum 420×460、加寬／縮放；完整 source range 與重要控制項可閱讀。
+- [ ] VoiceOver：title → period → metric／date → coverage／summary → date details → fetched／privacy/help 的實際閱讀順序與所有 actions。
+- [ ] VoiceOver 與視覺都能區分 explicit zero 和 missing；逐日 detail 不把缺日讀成零。
+- [ ] 鍵盤選 period、toolbar Refresh／Command-R、disclosures、Open Settings；Activity 為 key window 時觸發活動刷新。
+- [ ] 右鍵入口；重複開啟置前；close/reopen；最小化／恢復；單一活動視窗與無 permanent Dock icon。
+- [ ] Settings toggle on 不擷取；首次 enabled/idle open 擷取；available reopen 不擷取；manual Refresh 擷取。
+- [ ] 視窗開啟中 toggle off 立即清除；停用期間無活動擷取；Codex provider off 同樣清值。
+- [ ] 左鍵 Dashboard、右鍵 quota Refresh Now、Settings、Quit 與既有選單列顯示均維持原行為。
+
+M4 只交付此 presentation milestone；未加入 persistent history、成本／價格、model/thread/project analytics、burn rate／runway、widgets、notifications、background activity polling、其他 providers 或 Reset Intelligence。ROADMAP、README、公眾 Fumadocs、release notes、RC.2 version/build/tag/release records 不改動。
+
+### 自動驗證紀錄（2026-10-02）
+
+起始 `main` HEAD = `6b9b02dda5f89342e75629a59188fe5a4d3e3858`，`origin/main` = `3a63921fced7ed7fd68b4ddbc9c5b09e8c97be95`（`v0.2.0-rc.2`），乾淨 worktree、ahead 6。M4 僅建立本機 Conventional Commit，不 push／tag／release，也不修改 RC.2 metadata。
+
+| Gate | 實際結果／證據範圍 |
+| --- | --- |
+| 定向 regressions | **174 passed／0 failed／2 expected opt-in skips**；ActivityProjection／ActivityModel／service／store／consent、SettingsStore／SettingsIntegration、presentation／window、StatusItem、Codex adapter／transport／quota provider |
+| 新增 deterministic cases | **18 passed**：presentation／formatter 7 + window／settings／native layout／Command-R／rapid re-enable 11；原 StatusItem tests 同步擴充 action／ordering assertions |
+| M0／M1／M2／M3 regression | full parallel suite 全部通過；projection／domain、malformed／privacy、multi-method transport、disable／coalescing／late completion 均維持 |
+| 完整平行 XCTest | **433 passed／0 failed／6 expected opt-in skips**（439 total）；live gates 後續獨立明確啟用，沒有把 skip 當 PASS |
+| 原生 host／layout | English + zh-Hant、Light + Dark、Latest／7D／30D、420／560／760 widths 可 host/layout；minimum 420×460、close/reopen、toolbar 存在、Command-R key equivalent 實際到 shared model/source。不是人工畫面品質／VoiceOver PASS |
+| Clean Debug／Release | 兩個隔離 DerivedData 的 clean build 均 **BUILD SUCCEEDED**；version/build/project metadata 不改動 |
+| Sanitized Live M4 window | **1 passed／0 skipped**；隔離 Settings domain、production Runtime／shared client／service／model／native window；disabled open／enable 不啟動 runtime，明確 quota demand 建立共用 transport 後 enabled/idle open 擷取成功 |
+| Live Activity coverage | **56 buckets、7D 7／7、30D 30／30**；Latest 與 snapshot 最新 source bucket 相符，native hosting 逐一呈現 Latest／7D／30D，coverage 與 points reconcile；不輸出真實 token 值 |
+| Live reopen／manual／disable | available close/reopen 保留當次 projection；manual refresh 成功；disable 清 model／store，disabled refresh/open 不進活動 request queue；settings persistent domain 除 consent 外維持相同。另以 deterministic fixture 證明 rapid disable/re-enable 後新的 idle open 不被尚未完成的舊 window waiter 阻擋 |
+| Shared client／cleanup | quota → activity → quota 共用 **1 child／1 stdout reader**；同 client quota afterward PASS；service／client shutdown 後 PID 存在性確認已 reap、reader = **0** |
+| 獨立 Live Codex quota afterward | **1 passed／0 skipped**，在活動 gate 後另行執行既有 live provider case；未更動 quota mapping／refresh policy |
+| 零 automatic activity I/O | Runtime construction、Dashboard／Settings 建構與 Settings 系統／diagnostics refresh、enable 均未啟動 app-server／排入活動 queue；既有 production fake transport startup/coalescing tests 維持通過；quota scheduler source 未接任何 activity action |
+| persistence／privacy | default false、唯一 consent Bool、restart = enabled/idle 且 store 空、memory-only、failure/disable 清舊值、late completion 不復活；source/model/privacy regressions 通過；UI／AX 只用 normalized dates/counts 與 static/sanitized copy，diagnostics／logs 不加入活動數值 |
+| `git diff --check` | PASS |
+| 人工 visual／VoiceOver | **未驗收**；上方 checklist 全部待人員確認。沒有效能 soak、通知送達、Developer ID／notarization／distribution 驗證 |
+
+最終 gate logs 保留在隔離暫存路徑：`/tmp/QuotaMew-M4-regression.log`、`/tmp/QuotaMew-M4-full-verified.log`、`/tmp/QuotaMew-M4-clean-debug.log`、`/tmp/QuotaMew-M4-clean-release.log`、`/tmp/QuotaMew-M4-live-activity.log`、`/tmp/QuotaMew-M4-live-quota.log`。Live 只列 bucket／coverage counts 與 PASS flags；這些暫存檔案不 commit，不是 activity history persistence。初次測試抓到 native hosting minimum 設定順序與 fixture yield 等待競態，均修正並以最終全 suite 零失敗確認。
+
+**M4 AUTOMATED COMPLETE — MANUAL ACCEPTANCE REQUIRED**

@@ -81,6 +81,17 @@ final class ActivityModel {
         _ = await task.value
     }
 
+    /// Settings provider eligibility changes clear presentation synchronously.
+    /// Consent itself is retained; re-enabling the provider never fetches activity.
+    func providerEligibilityDidChange() {
+        clearCycle(state: .disabled)
+        let current = generation
+        Task {
+            guard generation == current else { return }
+            await invalidate()
+        }
+    }
+
     /// Future display/account lifecycle callers clear values before the service hop.
     func invalidate() async {
         let wasDisabled = state == .disabled
