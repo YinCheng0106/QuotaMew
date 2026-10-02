@@ -39,10 +39,21 @@ actor ActivityService {
     }
 
     func setCodexAccountActivityEnabled(_ enabled: Bool) async {
-        guard !isShutdown else { return }
-        await settings?.setCodexAccountActivityEnabled(enabled)
-        if !enabled { await invalidate(provider: .codex) }
+        _ = await setEnabled(enabled, provider: .codex)
+    }
+
+    func isEnabled(provider: ProviderID) async -> Bool {
+        guard !isShutdown else { return false }
+        return await consent(provider)
+    }
+
+    /// Settings remain the consent owner; only the implemented provider has a setter.
+    func setEnabled(_ enabled: Bool, provider: ProviderID) async -> Bool {
+        guard !isShutdown else { return false }
+        if provider == .codex { await settings?.setCodexAccountActivityEnabled(enabled) }
+        if !enabled { await invalidate(provider: provider) }
         // Enablement never starts work. Only an explicit refresh does.
+        return await isEnabled(provider: provider)
     }
 
     func refresh(provider: ProviderID) async throws -> ActivityFetchResult {

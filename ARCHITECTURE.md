@@ -175,7 +175,7 @@ Codex session event 可能包含 `primary` 與 `secondary` 視窗的使用百分
 
 ### v0.3 M1 — 獨立 Codex Account Activity boundary（2026-10-02）
 
-`TokenActivitySource.id`／`fetchActivity() async throws -> ActivityFetchResult` 與 `UsageProvider` 完全獨立。`CodexTokenActivitySource` 只透過注入的 M0 `readAccountUsageTransport()` 讀取 `account/usage/read`，不傳 `threadId`、不建立 client、不觸發 quota refresh。M1 階段未接入 production；M2 已加入下節的 memory store/service、consent 與共用 client 組裝。Query/model/UI 留給後續 milestones。
+`TokenActivitySource.id`／`fetchActivity() async throws -> ActivityFetchResult` 與 `UsageProvider` 完全獨立。`CodexTokenActivitySource` 只透過注入的 M0 `readAccountUsageTransport()` 讀取 `account/usage/read`，不傳 `threadId`、不建立 client、不觸發 quota refresh。M1 階段未接入 production；M2 已加入下節的 memory store/service、consent 與共用 client 組裝，M3 已加入 pure query／observable model。UI 留給 M4。
 
 Normalized domain 僅含 `ProviderCalendarDate`、非負 `Int64` 的 `ActivityBucket.reportedTokens`，以及單次讀取的 provider／靜態 provenance／`capturedAt`／bounded buckets。日期為合法 Gregorian 10-byte ASCII `YYYY-MM-DD`，不轉為 instant、不套用時區；最多 366 原始 entries，依日期遞增排序、相同重複去重、衝突拒絕。Explicit zero、未回報日期、missing／null／empty collection 維持不同語意。Missing/null/empty 回傳帶原因與成功擷取時間的 `.noDailyBuckets`，method-not-found 為獨立 `.unsupported`，其他失敗為無 raw message 的 `ActivityFetchError`。DTO 不解碼或保留 summary、threadUsage、帳號／模型／專案 metadata；所有候選 core fields 完整驗證後才發出 snapshot。詳細契約與 deterministic／sanitized live gates 見 [v0.3 架構](docs/V0_3_DAILY_USAGE_ARCHITECTURE.md)。既有 quota mapping、transport gate、timeout／cleanup、release metadata 均保持不變。
 
@@ -185,9 +185,15 @@ Normalized domain 僅含 `ProviderCalendarDate`、非負 `Int64` 的 `ActivityBu
 
 Store 只留每 provider 一份 current normalized snapshot，完整替換、不合併日期、不追加 history；另有 transient generation publication fence，沒有 status/error/raw DTO/account identity。Service 純按需 `refresh(provider:)`，每 provider 一個 shared task；caller cancellation 不取消共用 acquisition，而是在 bounded operation 完成後回 cancellation。Explicit `invalidate(provider:)`、disable 或 service `shutdown()` 撤銷 generation、取消 owned work 並清 store，late completion 無法重新發布。每次 refresh 開始先清舊值；unsupported、noDailyBuckets、unavailable、invalidData、failure、timeout 都清空，因為無法證明帳號連續性，不能沿用 quota stale policy。Service outcomes 沿用 `ActivityFetchResult`，僅增加 typed disabled/unavailable/failed；source 語意不變。
 
-SettingsStore 唯一新 persistence 為 `activity.codex.account.enabled` Bool；fresh/existing/missing/corrupt 均 default false，拒絕 UserDefaults 字串／數字 coercion。Service 在 source I/O 前與 publication 前再檢查 consent + Codex provider eligibility；enable 不 fetch，disable 經 service transition 立即 clear/invalidate。沒有 token persistence、timer、polling、startup activity request、quota piggyback、ActivityModel 或使用者介面。
+SettingsStore 唯一新 persistence 為 `activity.codex.account.enabled` Bool；fresh/existing/missing/corrupt 均 default false，拒絕 UserDefaults 字串／數字 coercion。Service 在 source I/O 前與 publication 前再檢查 consent + Codex provider eligibility；enable 不 fetch，disable 經 service transition 立即 clear/invalidate。沒有 token persistence、timer、polling、startup activity request 或 quota piggyback。M3 model 見下節，仍無使用者介面。
 
 M2 提供 future account/runtime lifecycle 的保守 invalidation API，沒有新增 identity read 或 connection observer。M0 RPC generation 不是 connection/account identity；quota-only reconnect 不會主動 invalidate idle store，M3 接 UI 前需補 display/demand lifecycle。每次 activity refresh 全份替換／失敗清值，不宣稱能偵測所有外部帳號切換。實作與分層驗證詳見 [v0.3 架構](docs/V0_3_DAILY_USAGE_ARCHITECTURE.md)。
+
+### v0.3 M3 — Pure projections 與 observable ActivityModel（2026-10-02）
+
+`ProviderCalendarDate` 以 year 0001…9999 的 proleptic Gregorian ordinal 做 `addingDays`／`distance`，不使用 Date instant、Calendar.current、系統時區或 locale。`ActivityProjection.query` 純查詢單一 current snapshot，以最新 provider source date 為 anchor；Latest 是最後回報 bucket，7D／30D 分別含 anchor 與前 6／29 個來源曆日，不是最後 N 筆 buckets。`ActivityPresentationPoint.reported` 與 `.missing` 明確區分供應商回報零與缺日；`ActivityCoverage` 提供 reported／expected／missing counts 與日期涵蓋完整旗標。`reportedTotal` 只加總已回報值，`completePeriodTotal` 僅在全部日期有回報時非 nil，仍不代表完整帳務／帳號活動。Checked Int64 overflow／range underflow 拒絕整份投影；empty snapshot 沒有 anchor，不當成零。
+
+Runtime 持有唯一 `@Observable @MainActor ActivityModel`，只依 service + pure query；AppModel 不含 activity。Model state 明確區分 disabled／idle／loading／available／noReportedBuckets（保留 empty／missing／null reason）／unsupported／unavailable／failed；只有 available 帶精確投影。建構與 enable 不 fetch，只有 `refresh()` 按需擷取；overlapping callers 共用 loading cycle，單一 caller cancellation 不影響共用 work。`setEnabled`／`invalidate` 先清 observable numbers 與 model generation，再依序呼叫 service transition；disable／failure／late completions 無法保留或復活舊投影。Future M4 display/consent intents 必須經 model，不能直接讀寫 store；外部 account lifecycle 偵測與 UI demand wiring 尚未加入。沒有新 UI、timer、persistence、formatting、quota／notification 行為變更。分層測試與 sanitized live gates 見 [v0.3 架構](docs/V0_3_DAILY_USAGE_ARCHITECTURE.md)。
 
 ## 7. Claude Code 資料來源評估
 

@@ -16,6 +16,7 @@ enum AppDependencies {
         let appModel: AppModel
         let activityService: ActivityService
         let activityStore: ActivitySnapshotStore
+        let activityModel: ActivityModel
         let settingsModel: SettingsModel
     }
 
@@ -73,6 +74,8 @@ enum AppDependencies {
             appModel: appModel,
             activityService: activityService,
             activityStore: activityStore,
+            activityModel: ActivityModel(service: activityService, providerID: .codex,
+                                         initiallyEnabled: settingsStore.isActivityEnabled(.codex)),
             settingsModel: SettingsModel(
                 store: settingsStore,
                 appModel: appModel,

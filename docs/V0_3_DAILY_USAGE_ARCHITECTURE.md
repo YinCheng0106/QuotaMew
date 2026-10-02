@@ -94,6 +94,8 @@ Equality 比較所有 typed 欄位（含 `capturedAt`），不使用 random UUID
 
 ## 5. Capability／status model
 
+M3 實作採單一 `ActivityModelState` enum：`disabled`、`idle`、`loading`、`available(ActivityProjection)`、`noReportedBuckets(source:capturedAt:reason:)`、`unsupported`、`unavailable(ActivityFetchError)`、`failed(ActivityFetchError)`。沒有 raw Error／任意字串、quota ProviderStatus 或額外 capability cache。下方兩軸 capability／runtime retry 描述保留為後續設計，不代表 M3 已實作；目前只有使用者明確要求才 refresh。
+
 不擴充 quota `ProviderStatus`。兩個小 enum，避免把所有組合做成多重狀態：
 
 | 狀態軸 | 值與轉移 |
@@ -199,16 +201,16 @@ Lifecycle 無法偵測所有外部帳號切換；即使持續開著畫面也可�
 | --- | --- |
 | latestReportedBucket | 唯一排序 array 的最後一筆；不是 Today，不推論尚未報告的後續日期 |
 | range(7／30) | end = latest source date；start = end − (N−1) civil days；不是「最後 N 筆 buckets」，也不是本機 today 回推 |
-| values | 固定 N 個 source-date slots：存在 → reported(value)，不存在 → missing；下限 0001 年無法構成 range 則 unavailable(rangeNotRepresentable)，不假造日期 |
+| values | 固定 N 個 source-date slots：存在 → reported(value)，不存在 → missing；下限 0001 年無法構成 range 則 query 拋出 invalidData／model failed，不假造日期 |
 | coverage count | distinct reported dates／N；explicit zero 算 reported date |
 | missing count | N − reported count；這只是 snapshot 沒報告該日期，不證明 provider 原始資料遺失 |
-| total | 使用 checked Int64 sum；overflow → aggregateUnavailable，不影響有效單日值。部分涵蓋時不顯示「7D／30D total」；可顯示「已回報 4／7 日合計 X」，並列 missing count |
+| reportedTotal | 使用 checked Int64 sum；任一 window overflow → query 拋出 `invalidData`，model 為 failed 並移除所有投影，不 wrap／clamp／轉 Double。部分涵蓋時只代表範圍內已回報值合計；`completePeriodTotal` 僅在所有來源日期都有回報時非 nil，仍不保證 provider bucket finality 或完整帳戶消耗 |
 | all N dates reported | 可顯示「7／30 個來源日期已回報值合計」，仍註明 provider source completeness unknown，不稱完整帳戶消耗 |
 | average／comparison | v0.3 不提供；不對缺日補零、除以 N 或做成長率 |
 
 無 buckets 時無 latest／range anchor，顯示 noDailyBuckets，不生成空白的 today chart。Coverage 全日期有值與資料完全涵蓋帳號是兩回事；初版永不產生 `.completeAccountHistory`。
 
-`ActivityModel` 產生靜態產品名稱、metric 說明、source-reported date、capture time、coverage count、missing count、age label、provenance explanation。零值可畫零點／0 標籤；missing 使用 gap／獨立符號與 VoiceOver「未回報」；unavailable 是獨立整體狀態。來源說明保留「供應商回報／涵蓋可能不完整／非即時／非帳務或額度消耗」。沒有 source timezone 故不使用「今日」摘要；latest bucket 明列來源日期。擷取時間可用本機時區顯示，須與來源日期分開標示。
+M3 `ActivityModel` 只暴露精確 normalized 值與語意 metadata，不格式化數字／日期或產生使用者文案。M4 才負責 metric 說明、age／provenance labels、零點／gap／VoiceOver 與擷取時間的本地化；來源日期仍不轉為本機「今日」。
 
 ## 12. Settings／consent
 
@@ -218,7 +220,11 @@ Settings 文案説明 opt-in 向 Codex 讀取帳號聚合活動、只留記憶�
 
 ## 13. Observable UI state ownership
 
-**`ActivityModel`：`@Observable @MainActor`，由 AppDependencies.Runtime 持有。** 觀察同 actor 的 observable store state，提供 computed bounded projections，避免維護第二份完整 snapshot。切換 range 只變本機 selection。Service 非 UI observable source，store 是唯一資料狀態來源；不新增 custom multicast/event infrastructure。
+**M3 `ActivityModel`：`@Observable @MainActor`，由 AppDependencies.Runtime 持有。** 只依賴 `ActivityService`，將明確 refresh 的 service outcome 經 pure `ActivityProjection.query` 轉成 atomic observable state；不讀取 store internals、不持有完整 raw snapshot 或 transport，也不接 AppModel。Actor `ActivitySnapshotStore` 是 acquisition snapshot owner，model 僅持有 Latest／7D／30D 的 bounded 投影。沒有 store observer、custom multicast、range selection、timer 或 background task loop。
+
+API 為 `refresh() async throws`、`setEnabled(_:) async`、`invalidate() async`。建構由 composition 傳入當下 eligibility，只設 disabled／idle，不建立 task 或 fetch；enable 同樣只進 idle。所有 UI intent 在 MainActor 先清 projections／撤銷 generation，再將 lifecycle transitions 依序送往 service；consent Bool 唯一 writer 仍是 SettingsStore。Refresh 等待進行中的 transition，overlapping callers 共用同一 loading cycle；取消單一 caller 只在 bounded cycle 完成後向該 caller 回 `CancellationError`，不取消共用 source work。Disable／invalidate 取消 model-owned task 並透過 service 清除 snapshot，late completion 由 model + service 雙層 generation fence 擋下。
+
+M4 必須經這份共用 model 呼叫 UI refresh／consent／display invalidation，不能直接改 store。外部帳號切換仍無可靠 identity signal；M3 不宣稱能偵測所有 account changes。下方 AppModel callbacks／window demand／UI 保留為後續設計，M3 未加入。
 
 AppModel 繼續觀察 quota provider states／quota refreshing／quota capture metadata；不接 activity buckets、capability、錯誤或 refresh task。允許少量 outbound callback 通知 activity quota busy／idle、Codex unavailable／eligibility，與 quota 結果無關；callback 不 await activity、不影響 notification completion／schedule deadline。
 
@@ -266,7 +272,7 @@ Activity 無 automatic retry／restart、不能 suppress quota notifications、�
 | malformed bucket／core collection type | 任一 malformed core 拒絕整份；不跳過錯誤 row 後補零 |
 | unknown extra fields | typed Decodable 忽略，不保存、不顯示；byte bound 限制未知字段佔用。深層未知 JSON 超過 decoder 能力也安全失敗，不擴大 parser |
 | unsolicited stream output | 無匹配 ID 的合法 envelope／未知 notification 即丟棄；request timeout 不因 unsolicited data 延長。不得排隊保存 |
-| local resources | 一個 child／reader／active slot、各一個 pending method、一個 service task、366 published buckets + 至多一份候選、30 projection slots；CPU／RSS 需 M5 Release 量測 |
+| local resources | 一個 child／reader／active slot、各一個 pending method、一個 service task、366 published buckets + 至多一份候選、7 + 30 projection slots；CPU／RSS 需 M5 Release 量測 |
 
 ## 17. Test architecture（僅計畫，尚未寫 tests）
 
@@ -292,13 +298,13 @@ M5 另做 native window／menu light/dark、narrow width、keyboard、VoiceOver�
 | --- | --- | --- |
 | `QuotaMew/Domain/Activity/ProviderCalendarDate.swift` | 日期驗證、比較、civil arithmetic | domain；只依 Foundation/value helpers |
 | `QuotaMew/Domain/Activity/ProviderActivitySnapshot.swift` | snapshot、bucket、source、fetch result／typed status/error | domain；依 ProviderID／ProviderCalendarDate；不依 DTO/UI |
-| `QuotaMew/Domain/Activity/ActivityQueries.swift` | 7/30 projection、coverage、checked reported sums | pure domain；依 snapshot |
+| `QuotaMew/Domain/Activity/ActivityProjection.swift` | 已實作 Latest／7/30 projection、explicit gaps、coverage、checked reported sums | pure domain；依 snapshot |
 | `QuotaMew/Providers/TokenActivitySource.swift` | 獨立能力介面 | integration boundary；依 activity domain |
 | `QuotaMew/Providers/Codex/CodexAccountActivityDTO.swift` | typed result、core validation、reader contract | Codex adapter layer；不被 UI/service 匯入 |
 | `QuotaMew/Providers/Codex/CodexActivitySource.swift` | DTO→allowlisted snapshot、擷取時間 | source adapter；依 private reader + domain |
-| `QuotaMew/Services/ActivitySnapshotStore.swift` | observable bounded memory state | Runtime 持有；ActivityService 唯一 writer；依 domain |
+| `QuotaMew/Services/ActivitySnapshotStore.swift` | 已實作 actor bounded current snapshot | Runtime 持有；ActivityService 唯一 writer；依 domain |
 | `QuotaMew/Services/ActivityService.swift` | consent/demand、coalescing、invalidation、generation guard | Runtime 持有；依 source/store + injected closures；不依通知/reset |
-| `QuotaMew/Features/Activity/ActivityModel.swift` | range selection、read-only UI projections、demand intents | Runtime 持有；依 store/query + service；不依 Codex DTO |
+| `QuotaMew/Features/Activity/ActivityModel.swift` | 已實作 observable projections、refresh／enable／invalidate intents | Runtime 持有；只依 service + pure query；不依 store internals／Codex DTO |
 | `QuotaMew/Features/Activity/ActivityWindowView.swift` | minimal 原生活動 window、來源與 gap 呈現 | App scene 持有；依 ActivityModel |
 
 Tests 對應 domain、source、service/model 新 suites 與合成 fixtures，transport cases 放入既有 `CodexAppServerClientTests`；不建立空未來 provider/persistence/cost files。Typed lifecycle signal 與 request gate 初版留在既有 client 檔案，不拆 generic RPC package。
@@ -326,7 +332,7 @@ Tests 對應 domain、source、service/model 新 suites 與合成 fixtures，tra
 | M0 — transport capability + fixtures | 先 synthetic two-method fake server fixtures、single-slot quota priority、method-aware decoding、2 秒 activity timeout、cancellation／cleanup isolation；無 UI／consent／activity background I/O。先證明失敗後下一個 quota request 成功，再接 live adapter |
 | M1 — Codex activity adapter | date/domain/query 值 + typed DTO + TokenActivitySource／CodexActivitySource；所有 validation fixtures 與 privacy sentinels；production activity 尚不呼叫 |
 | M2 — memory store/service | memory-only actor full replacement、default-off consent、final I/O eligibility、generation-fenced invalidation、per-provider coalescing、single client sharing；純 on-demand API／開發 tests opt-in，不新增可見設定；無 cooldown 或 quota lifecycle callbacks |
-| M3 — observable model | read-only projections、7/30 partial coverage、capture attribution、disable/close immediate clearing；mock previews；仍不向使用者宣稱可用 |
+| M3 — observable model | pure projections、7/30 partial coverage、capture attribution、refresh／enable／invalidate immediate clearing；synthetic deterministic tests；沒有可見 UI／previews 或自動 refresh |
 | M4 — minimal UI | consent Bool + 原生活動 window／Dashboard 入口、visible demand、localization、keyboard／VoiceOver；預設 off、unsupported/no buckets/failure 正確顯示；只有這時對使用者可啟用 |
 | M5 — reliability/privacy/performance | 全 quota regressions、activity fault matrix、privacy checks、Release resource/priority measurements、manual UI、sanitized opt-in live checks分列；未滿足前不承諾 v0.3 ready-to-release |
 
@@ -368,4 +374,20 @@ M2 gates（2026-10-02）：新增 17 個 deterministic tests（store 3、service
 
 獨立 opt-in Live M2 production-style service probe **1 passed／0 skipped**，隔離設定 domain、明確 enable、on-demand refresh 得到 **56 buckets**（只報 count，未輸出 token 值），store/returned snapshot 相符、排序通過；quota→activity→quota 共用 **1 child／1 stdout reader**，disable 清 store、disabled refresh 不進 transport，service shutdown 不關閉 quota，最終 client shutdown 後 child 已 reap、reader = 0。隨後另行執行既有 Live Codex quota test **1 passed／0 skipped**（packaged ChatGPT runtime）。未做效能 soak、manual UI、通知送達、簽章/notarization/distribution；沒有 M3+ model/view/query 或新設定 UI。
 
-**FINAL STATUS：READY TO IMPLEMENT v0.3 M3。** M2 gates 已完成；不是 v0.3 已通過 release gates 或已承諾發行。
+**M2 checkpoint：READY TO IMPLEMENT v0.3 M3。** M2 gates 已完成；不是 v0.3 已通過 release gates 或已承諾發行。
+
+## M3 implementation／validation checkpoint（2026-10-02）
+
+已實作 `ActivityProjection`、`ActivityWindowProjection`、`ActivityCoverage`、`ActivityPresentationPoint`，以及獨立的 `ActivityModel`／`ActivityModelState`。純查詢只用當次 snapshot，以 latest provider source date 作 anchor，7D = anchor−6…anchor、30D = anchor−29…anchor；不使用最後 N 筆 buckets、不轉 Asia/Taipei、不填零或回補較舊日期。Latest explicit zero 仍是 reported；empty snapshot 回無 projection，model 保留 successful capture/source 與 empty reason，不等於 unsupported／disabled／failed。4／7 regression 明確得到 4 reported、7 expected、3 missing、partial reportedTotal，`completePeriodTotal == nil`。
+
+日期使用 timezone-free proleptic Gregorian ordinal，支援正負加日與日距；year 0001…9999、month/year/leap-century boundaries、Int offset overflow 都驗證。任一 7D／30D sum overflow 或不可表示範圍拒絕整份 query，model 為 failed(invalidData)，不保留單日／範圍數字；不更動 M1 非負 Int64 validation。日期涵蓋完整不保證 provider bucket finality、完整帳戶歷史、帳務 tokens 或 subscription quota 消耗。
+
+Model 以 enum atomic publication 提供八種狀態；只依 service／query，Runtime 組裝唯一 model/service/store，quota/activity 繼續共享唯一 Codex client。`refresh` 純 user intent；construction／enable 零 source I/O，re-enable 為 idle，disable／invalidate 先移除 observable projections。Model generation 擋下 old completion，overlapping refresh 共用 loading task；transition 自己先發布 eligibility，再完成 task，避免等待 transition 的 refresh 與 setter completion 互相覆寫。Caller cancellation 不取消共用 acquisition。沒有新增 store observer、account identity read、AppModel callback、timer、formatting、UI、persistence 或其他 provider integration；future M4 需經 model 接 display/consent lifecycle，M3 不宣稱能感知所有外部帳號切換。
+
+新增 **20 個 deterministic tests**（projection/date 8、model 12）通過；涵蓋 shuffled Latest／zero／empty、7D 缺日 regression、complete／partial 30D、月界／年界／閏日、全部合法年份 month-boundary round trips、exact Int64 checked sums／overflow；模型涵蓋 observation、loading／success／empty reasons／所有失敗、no raw-error sentinel、no token persistence、disable/re-enable、late completion／newer generation、20 overlapping callers／one canceled waiter、refresh during enable transition。既有 production shared-transport regression 增加 Runtime model startup／enable 零 I/O、共用 child、model refresh／invalidate checks。M0／M1／M2 全部維持通過。
+
+定向 domain／query／model／store／service／consent／SettingsStore／Codex adapter／M0 multi-method transport／app-server／quota provider 回歸 **126 passed／0 failed／2 預期 opt-in skips**。完整平行 XCTest **415 passed／0 failed／5 預期 opt-in skips**；clean Debug／Release build、`git diff --check` 通過。獨立 sanitized Live ActivityModel probe **1 passed／0 skipped**：隔離 test settings，enable 未啟動 app-server；quota demand 建立健康共用 child 後，明確 model refresh 得到 **56 buckets、7D 7／7、30D 30／30**，只輸出 bucket／coverage counts，沒有 token 值。Projection deterministic equality／coverage reconciliation、activity 不更動 settings persistence、disable model/store 清除、同 client quota afterward PASS、shutdown 後 child 已 reap／reader = 0。其後另行 Live Codex quota test **1 passed／0 skipped**，packaged ChatGPT runtime、2 quota windows；使用 test-runner 環境變數明確 opt-in，非 skipped gate。
+
+沒有 manual UI、效能／RSS／CPU、通知送達、簽章／notarization／distribution 驗證；M3 不加入可見介面，M4 尚未開始。ROADMAP、README、Fumadocs、release metadata 與 v0.2.0-rc.2 history 未變更。
+
+**FINAL STATUS：READY TO IMPLEMENT v0.3 M4。** 這是 M3 implementation checkpoint，仍不是 v0.3 release-ready 承諾。

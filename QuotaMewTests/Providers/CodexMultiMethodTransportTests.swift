@@ -18,6 +18,13 @@ final class CodexMultiMethodTransportTests: XCTestCase {
             XCTAssertTrue(queues == (0, 0, 0), "Production assembly never requests activity or quota in tests")
             let notStarted = await server.client.runtimeDiagnostic()
             XCTAssertEqual(notStarted.appServerState, .notStarted)
+            XCTAssertEqual(runtime.activityModel.state, .idle)
+            await runtime.activityModel.setEnabled(false)
+            XCTAssertEqual(runtime.activityModel.state, .disabled)
+            await runtime.activityModel.setEnabled(true)
+            XCTAssertEqual(runtime.activityModel.state, .idle)
+            let afterEnable = await server.client.runtimeDiagnostic()
+            XCTAssertEqual(afterEnable.appServerState, .notStarted)
             let quota = Task { await runtime.appModel.refresh() }
             let first = try await server.nextRequest()
             XCTAssertEqual(first.method, "account/rateLimits/read")
@@ -42,6 +49,17 @@ final class CodexMultiMethodTransportTests: XCTestCase {
                 let next = try await server.quota()
                 XCTAssertEqual(next.pid, first.pid)
             }
+            let modelRefresh = Task { try await runtime.activityModel.refresh() }
+            let modelEvent = try await server.nextRequest()
+            XCTAssertEqual(modelEvent.method, "account/usage/read")
+            XCTAssertEqual(modelEvent.pid, first.pid)
+            try server.reply(fixture: "valid-usage")
+            try await modelRefresh.value
+            guard case .available = runtime.activityModel.state else {
+                XCTFail("Production model must consume shared service result"); await server.close(); return
+            }
+            await runtime.activityModel.invalidate()
+            XCTAssertEqual(runtime.activityModel.state, .idle)
             await runtime.activityService.shutdown()
             let cleared = await runtime.activityStore.snapshot(for: .codex)
             XCTAssertNil(cleared)
