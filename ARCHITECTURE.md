@@ -173,6 +173,12 @@ Codex session event 可能包含 `primary` 與 `secondary` 視窗的使用百分
 - screen scraping 互動式 `/status`：脆弱且不是 machine contract
 - 由 token 數推估方案額度：provider 可控制加權方式，無法可靠重建
 
+### v0.3 M1 — 獨立 Codex Account Activity boundary（2026-10-02）
+
+`TokenActivitySource.id`／`fetchActivity() async throws -> ActivityFetchResult` 與 `UsageProvider` 完全獨立。`CodexTokenActivitySource` 只透過注入的 M0 `readAccountUsageTransport()` 讀取 `account/usage/read`，不傳 `threadId`、不建立 client、不觸發 quota refresh。此 adapter 尚未接入 `AppDependencies` 或任何 production caller；memory store、service、Settings、排程、query 與 UI 留給後續 milestones。
+
+Normalized domain 僅含 `ProviderCalendarDate`、非負 `Int64` 的 `ActivityBucket.reportedTokens`，以及單次讀取的 provider／靜態 provenance／`capturedAt`／bounded buckets。日期為合法 Gregorian 10-byte ASCII `YYYY-MM-DD`，不轉為 instant、不套用時區；最多 366 原始 entries，依日期遞增排序、相同重複去重、衝突拒絕。Explicit zero、未回報日期、missing／null／empty collection 維持不同語意。Missing/null/empty 回傳帶原因與成功擷取時間的 `.noDailyBuckets`，method-not-found 為獨立 `.unsupported`，其他失敗為無 raw message 的 `ActivityFetchError`。DTO 不解碼或保留 summary、threadUsage、帳號／模型／專案 metadata；所有候選 core fields 完整驗證後才發出 snapshot。詳細契約與 deterministic／sanitized live gates 見 [v0.3 架構](docs/V0_3_DAILY_USAGE_ARCHITECTURE.md)。既有 quota mapping、transport gate、timeout／cleanup、release metadata 均保持不變。
+
 ## 7. Claude Code 資料來源評估
 
 ### 優先方案：有文件的 status-line JSON 與 opt-in bridge

@@ -1,0 +1,16 @@
+{
+  "dailyUsageBuckets": [
+    {"startDate": "2026-10-03", "tokens": 42, "model": "model-secret"},
+    {"startDate": "2026-10-01", "tokens": 0}
+  ],
+  "email": "private@example.com",
+  "accountId": "acct-secret",
+  "summary": {"tokens": 999, "raw": "SECRET_RAW_JSON"},
+  "threadUsage": [{
+    "threadId": "thread-secret", "sessionId": "session-secret",
+    "workspace": "/private/repo", "repository": "repo-secret",
+    "model": "model-secret", "reasoningEffort": "reasoning-secret",
+    "prompt": "SECRET_PROMPT", "response": "response-secret", "toolOutput": "tool-secret"
+  }],
+  "future": {"unknown": [null, {"private": "SECRET_RAW_JSON"}]}
+}

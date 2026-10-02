@@ -4,6 +4,46 @@ import XCTest
 @testable import QuotaMew
 
 final class CodexMultiMethodTransportTests: XCTestCase {
+    func testM1AdapterUsesSharedTransportAndPreservesQuotaAfterInvalidDataAndUnsupported() async throws {
+        let server = try ScriptedCodexServer()
+        do {
+            let first = try await server.quota()
+            let diagnostic = await server.client.runtimeDiagnostic()
+            let source = CodexTokenActivitySource(reader: server.client, now: { .distantPast })
+            let valid = Task { try await source.fetchActivity() }
+            _ = try await server.nextRequest()
+            try server.reply(fixture: "valid-usage")
+            guard case .snapshot(let snapshot) = try await valid.value else {
+                XCTFail("Expected validated activity snapshot")
+                await server.close()
+                return
+            }
+            XCTAssertEqual(snapshot.buckets.map(\.reportedTokens), [2100, 0])
+            for invalid in [false, true] {
+                let activity = Task { try await source.fetchActivity() }
+                let event = try await server.nextRequest()
+                XCTAssertEqual(event.pid, first.pid)
+                if invalid {
+                    try server.reply(fixture: "malformed-usage")
+                    do { _ = try await activity.value; XCTFail("Expected invalid core rejection") }
+                    catch { XCTAssertEqual(error as? ActivityFetchError, .invalidData) }
+                } else {
+                    try server.sendLines(["{\"id\":\(event.id),\"error\":{\"code\":-32601," +
+                        "\"message\":\"private@example.com acct-secret thread-secret /private/repo SECRET_PROMPT SECRET_RAW_JSON\"}}"])
+                    let result = try await activity.value
+                    XCTAssertEqual(result, .unsupported)
+                    XCTAssertFalse(String(reflecting: result).contains("SECRET"))
+                }
+                let after = await server.client.runtimeDiagnostic()
+                XCTAssertEqual(diagnostic, after)
+                let quota = try await server.quota()
+                XCTAssertEqual(quota.pid, first.pid)
+            }
+            await server.close()
+            XCTAssertTrue(isReaped(first.pid))
+        } catch { await server.close(); throw error }
+    }
+
     func testAlternatingMethodsInitializeOnceAndReuseOneChild() async throws {
         let server = try ScriptedCodexServer()
         do {
