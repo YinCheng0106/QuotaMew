@@ -4,6 +4,84 @@ import XCTest
 @testable import QuotaMew
 
 final class CodexMultiMethodTransportTests: XCTestCase {
+    @MainActor
+    func testM2ProductionAssemblyIsIdleSharesClientAndServiceShutdownPreservesQuota() async throws {
+        let server = try ScriptedCodexServer()
+        let name = "M2Assembly-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let settings = SettingsStore(defaults: defaults)
+        settings.setCodexAccountActivityEnabled(true)
+        let runtime = AppDependencies.makeRuntime(settingsStore: settings, codexClient: server.client)
+        do {
+            let queues = await server.client.requestQueueCounts()
+            XCTAssertTrue(queues == (0, 0, 0), "Production assembly never requests activity or quota in tests")
+            let notStarted = await server.client.runtimeDiagnostic()
+            XCTAssertEqual(notStarted.appServerState, .notStarted)
+            let quota = Task { await runtime.appModel.refresh() }
+            let first = try await server.nextRequest()
+            XCTAssertEqual(first.method, "account/rateLimits/read")
+            try server.reply()
+            await quota.value
+            let diagnostic = await server.client.runtimeDiagnostic()
+            for _ in 0..<2 {
+                let activity = Task { try await runtime.activityService.refresh(provider: .codex) }
+                let event = try await server.nextRequest()
+                XCTAssertEqual(event.method, "account/usage/read")
+                XCTAssertEqual(event.pid, first.pid)
+                XCTAssertEqual(event.initialized, 1)
+                XCTAssertFalse(event.overlap)
+                try server.reply(fixture: "valid-usage")
+                guard case .snapshot(let snapshot) = try await activity.value else {
+                    XCTFail("Expected service snapshot"); await server.close(); return
+                }
+                let stored = await runtime.activityStore.snapshot(for: .codex)
+                XCTAssertEqual(stored, snapshot)
+                let after = await server.client.runtimeDiagnostic()
+                XCTAssertEqual(after, diagnostic, "Activity does not update quota diagnostics")
+                let next = try await server.quota()
+                XCTAssertEqual(next.pid, first.pid)
+            }
+            await runtime.activityService.shutdown()
+            let cleared = await runtime.activityStore.snapshot(for: .codex)
+            XCTAssertNil(cleared)
+            let quotaAfterShutdown = try await server.quota()
+            XCTAssertEqual(quotaAfterShutdown.pid, first.pid, "Service must not shut down the shared client")
+            await server.close()
+            XCTAssertTrue(isReaped(first.pid))
+        } catch { await runtime.activityService.shutdown(); await server.close(); throw error }
+    }
+
+    @MainActor
+    func testM2DisableCancelsQueuedActivityWithoutTouchingActiveQuota() async throws {
+        let server = try ScriptedCodexServer()
+        let name = "M2Queued-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let settings = SettingsStore(defaults: defaults)
+        let store = ActivitySnapshotStore()
+        let service = ActivityService(sources: [CodexTokenActivitySource(reader: server.client)], store: store, settings: settings)
+        await service.setCodexAccountActivityEnabled(true)
+        do {
+            let quota = Task { try await server.client.readRateLimits() }
+            let first = try await server.nextRequest()
+            let activity = Task { try await service.refresh(provider: .codex) }
+            try await waitForQueue(server.client, active: 1, quota: 0, activity: 1)
+            await service.setCodexAccountActivityEnabled(false)
+            do { _ = try await activity.value; XCTFail("Expected cancelled activity waiter") }
+            catch is CancellationError {}
+            try await waitForQueue(server.client, active: 1, quota: 0, activity: 0)
+            XCTAssertFalse(isReaped(first.pid))
+            try server.reply()
+            _ = try await quota.value
+            let next = try await server.quota()
+            XCTAssertEqual(next.pid, first.pid)
+            XCTAssertEqual(next.id, first.id + 1, "Disabled queued activity writes no RPC")
+            await service.shutdown()
+            await server.close()
+        } catch { await service.shutdown(); await server.close(); throw error }
+    }
+
     func testM1AdapterUsesSharedTransportAndPreservesQuotaAfterInvalidDataAndUnsupported() async throws {
         let server = try ScriptedCodexServer()
         do {

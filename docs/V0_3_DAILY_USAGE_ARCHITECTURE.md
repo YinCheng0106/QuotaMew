@@ -12,6 +12,16 @@ M1 保留 §6 核准 result 契約：missing／null／empty collection 各回傳
 
 M1 gates：domain 9、adapter 15 個 deterministic tests 通過，新增 1 個 adapter→M0 共享 transport 回歸測試通過；既有 16 個 M0 multi-method、14 個 app-server client、13 個 quota provider deterministic tests 全通過。合成 privacy fixture 與 raw-error sentinels 未進入 DTO 投影、domain 或正規化錯誤。完整平行 XCTest **378 passed／0 failed／3 預期 opt-in skips**；clean Debug／Release build、`git diff --check` 通過。獨立 opt-in live M1 adapter probe 通過：**55 buckets**（未輸出 token 值），日期／值／排序／capture／Codex provenance 通過；同一 client 在 activity 後可再次讀取 quota，child／reader 不重建，shutdown 後 child 已 reap、reader = 0。既有 Live Codex quota test 隨後另行通過（packaged ChatGPT runtime）。未做效能量測、UI、通知送達、notarization 或 distribution 驗證。**目前狀態：READY TO IMPLEMENT v0.3 M2**；M2+ store／service／model／query／Settings／scheduling／UI 仍未實作。
 
+M2 implementation note（2026-10-02）：`ActivitySnapshotStore` 與 `ActivityService` 已實作為獨立 actor，Runtime 持有兩者；store 只留 provider-keyed 的單份 current normalized snapshot，完整替換、不合併日期、不留 history/status/error、不寫磁碟。Store 另留至多每 provider 一個短生命週期 UUID publication fence；不是 identity，不進 snapshot、設定或 diagnostics。Refresh 開始先清舊值，只有已驗證、provider 相符且 consent/generation 仍有效的成功結果可發布；missing/null/empty `.noDailyBuckets`、unsupported、unavailable、invalidData、failure、timeout、disable/invalidate 全部不留舊數字。M1 的 explicit zero／missing／source-date／duplicate semantics 不變；synthetic empty snapshot 合法，Codex empty collection 仍回 `.noDailyBuckets(.emptyCollection)`。
+
+M2 service API：`refresh(provider:) async throws -> ActivityFetchResult`、`setCodexAccountActivityEnabled(_:)`、`invalidate(provider:)`、`shutdown()`。沿用同一 result enum，增加 application `.disabled`、`.unavailable(ActivityFetchError)`、`.failed(ActivityFetchError)`；不另建平行狀態 hierarchy。每 provider 一個 shared task，overlapping callers 共用 acquisition/publication；caller cancellation 不取消 shared source task，等 bounded operation 完成後向該 caller 回 `CancellationError`。Explicit invalidation 先撤銷 generation、取消 activity task、清 store；cancellation-insensitive late candidate 同樣無法復活。Shutdown 停止 admission、取消／drain 當下 owned work 並清所有 snapshots，**不關閉共用 transport**。
+
+M2 consent：SettingsStore 保存唯一新 Bool `activity.codex.account.enabled`，missing／非 CFBoolean 的值預設 false，不覆寫未知值；既有使用者同樣 opt-in。Source I/O 入場前與 publication 前重新檢查 consent + quota provider eligibility。應用層 enable/disable 經 service 方法，SettingsStore 仍是 persistence owner；enable 不自動 fetch，disable 清值與取消／invalidate。直接更改 SettingsStore 的測試也驗證 final admission/publication recheck，但未接入任何 Settings UI。
+
+M2 production ownership：`makeRuntime()` 明確建立唯一 `CodexAppServerClient`，注入 `CodexProvider` 與 `CodexTokenActivitySource`；測試可注入相同 client 與隔離 SettingsStore。Runtime 僅保留 activity service/store，不新增 AppModel activity state。既有 client 內 `CodexConnectionLifecycle` 保留唯一 transport termination/deinit/shutdown cleanup 責任；service 不持有 client shutdown API。Process 結束即丟棄所有 activity memory；App termination 仍由既有 transport observer 終止並 reap child/reader。建構、啟動、enable、quota refresh 均不要求 activity；沒有 timer、background loop、piggyback、cooldown/query/model/UI。Future visible demand/cooldown 屬 M3/M4 後續範圍。
+
+M2 account-context 邊界：M0 request generation 是 RPC batch generation，不能充當 connection/account discriminator；本次未加 connection observer 或 auth identity tracking，也不宣稱能偵測所有外部帳號切換。已暴露 `invalidate(provider:)` 供 future auth/runtime/provider-unavailable lifecycle 接點使用；目前 every explicit activity refresh 先清舊值，成功全份取代、任何失敗清空。Quota-only disconnect/reconnect 不會主動通知 idle activity store；尚無 activity UI，因此不將留存值宣稱為「目前帳號」。M3 接 UI 前必須處理 display/demand lifecycle 與 context invalidation，不能以此 snapshot 推論帳號連續性。
+
 ## 1. 範圍與非目標
 
 **GO WITH EXPLICIT LIMITATIONS**：使用 stable `account/usage/read`，不提供 `threadId`、不開啟 experimental API，取得 **Codex Account Activity** snapshot。數值名稱為 **Provider-reported token activity**（供應商回報的 token 活動量）。採 explicit opt-in、獨立能力判定、memory-only、整份替換。
@@ -106,7 +116,7 @@ protocol TokenActivitySource: Sendable {
 }
 ```
 
-`ActivityFetchResult` 只有 `.snapshot(ProviderActivitySnapshot)`、`.noDailyBuckets(source: ActivitySource, capturedAt: Date, reason: NoDailyBucketsReason)`、`.unsupported`。暫時性／validation error 為 typed `ActivityFetchError`，cancellation 保持 `CancellationError`。Service 驗證 result provider 與 source 契約，不接受錯 provider snapshot。
+M1 source 回傳 `ActivityFetchResult` 的 `.snapshot(ProviderActivitySnapshot)`、`.noDailyBuckets(source: ActivitySource, capturedAt: Date, reason: NoDailyBucketsReason)`、`.unsupported`；暫時性／validation error 為 typed `ActivityFetchError`，cancellation 保持 `CancellationError`。M2 同 enum 增加 service-level `.disabled`、`.unavailable(ActivityFetchError)`、`.failed(ActivityFetchError)`，Codex adapter 不產生這三種 application outcomes。Service 驗證 result provider，不接受錯 provider snapshot。
 
 `CodexActivitySource` 依賴 provider-private `CodexAccountActivityReading.readAccountActivity()`，使用同一 client。DTO 解碼與 mapping 留在 `Providers/Codex/`，UI／service 不接收 DTO、任意 strings、JSON 或 Codex error bodies。Capability 由 `ActivityService` 根據這次低優先 activity request 的結果判定；不新增 discovery RPC，不把它放入 quota runtime health。Shared transport 可發送 typed lifecycle invalidation，與業務 source protocol 分開。
 
@@ -159,15 +169,15 @@ Visible view 不持有 scheduler/timer。擷取超過 60 分鐘只呈現「較�
 | 項目 | 決策 |
 | --- | --- |
 | Owner | `AppDependencies.Runtime` 建立並透過 service／model 持有單一 instance |
-| Isolation | `@Observable @MainActor`；現有 UI／settings 在同一 actor，不需要額外 store actor 與 stream subscription |
+| Isolation | M2 已實作為獨立 actor，無 Observation／stream subscription；後續 M3 必須以實際 actor read boundary 設計 model |
 | Lifetime | runtime lifetime；snapshot 僅存在於 consent + 可見 demand 的短生命週期，process 結束不保留 |
-| State | 至多一個 Codex snapshot、capability、availability、successful capture metadata、local generation counter；不是 provider → history map |
-| Mutation | 只有 ActivityService 能 replace／clear／改 status；MainActor 同步 atomic assignment；UI 無寫入權限 |
+| State | 每 supported provider 至多一份 current snapshot 與一個 transient publication UUID；不保存 status/error/history/account identity |
+| Mutation | Production writer 為 ActivityService；store actor 同步完整 replace／clear 與 generation-fenced publication；沒有 UI writer |
 | Reads | read-only state 與 bounded pure query；完整 buckets 不進 AppModel 或 Dashboard |
 | Replacement | 候選完整驗證 + eligibility/generation 再檢查後單次 replace；noDailyBuckets 也清除舊資料 |
 | Bounds | 366 buckets／snapshot，最多一份已發布值 + 一份 bounded 解碼候選；no archive、append、launch restore |
 
-每次 consent/demand/context 撤銷先同步提升 service generation 並清 store/model projection，再取消 async task。Task 在所有 await 後、尤其 publish 前重新檢查 generation、consent、Codex enabled 與 demand，防止已關閉後的 late result 復活。Generation 是本機短生命週期控制值，不是帳號 ID，也不進 snapshot、settings 或 logs。
+M2 consent/context 撤銷先移除 service current generation 並取消 async task，再 await store clear；store 同 actor 的 publication fence 防止跨 actor suspension 競態。I/O/publication 前重新檢查 generation、consent、Codex enabled。M2 尚無 model/projection/visible demand，後續需另接。Generation 是本機短生命週期控制值，不是帳號 ID，也不進 snapshot、settings 或 logs。
 
 ## 10. Account-context invalidation
 
@@ -315,7 +325,7 @@ Tests 對應 domain、source、service/model 新 suites 與合成 fixtures，tra
 | --- | --- |
 | M0 — transport capability + fixtures | 先 synthetic two-method fake server fixtures、single-slot quota priority、method-aware decoding、2 秒 activity timeout、cancellation／cleanup isolation；無 UI／consent／activity background I/O。先證明失敗後下一個 quota request 成功，再接 live adapter |
 | M1 — Codex activity adapter | date/domain/query 值 + typed DTO + TokenActivitySource／CodexActivitySource；所有 validation fixtures 與 privacy sentinels；production activity 尚不呼叫 |
-| M2 — memory store/service | memory-only full replacement、disabled/no-demand zero-I/O、generation invalidation、coalescing/cooldown、client sharing；quota lifecycle callbacks 注入；開發／tests opt-in，不新增可見設定 |
+| M2 — memory store/service | memory-only actor full replacement、default-off consent、final I/O eligibility、generation-fenced invalidation、per-provider coalescing、single client sharing；純 on-demand API／開發 tests opt-in，不新增可見設定；無 cooldown 或 quota lifecycle callbacks |
 | M3 — observable model | read-only projections、7/30 partial coverage、capture attribution、disable/close immediate clearing；mock previews；仍不向使用者宣稱可用 |
 | M4 — minimal UI | consent Bool + 原生活動 window／Dashboard 入口、visible demand、localization、keyboard／VoiceOver；預設 off、unsupported/no buckets/failure 正確顯示；只有這時對使用者可啟用 |
 | M5 — reliability/privacy/performance | 全 quota regressions、activity fault matrix、privacy checks、Release resource/priority measurements、manual UI、sanitized opt-in live checks分列；未滿足前不承諾 v0.3 ready-to-release |
@@ -354,4 +364,8 @@ Tests 對應 domain、source、service/model 新 suites 與合成 fixtures，tra
 
 **FIRST IMPLEMENTATION TASK：M0 以 synthetic two-method fake app-server fixtures 先驗證 single-slot request gate、quota pending priority，以及 activity timeout／cancel 後下一個 quota request 的健康恢復。**
 
-**FINAL STATUS：READY TO IMPLEMENT v0.3 M0。** 這是架構可進入實作的判定，不是 v0.3 已實作、通過 release gates 或已承諾發行。
+M2 gates（2026-10-02）：新增 17 個 deterministic tests（store 3、service 10、consent/privacy 2、production shared-transport 2）通過；定向 regression 共 106 passed，M0/M1/domain/SettingsStore/quota tests 全部維持通過。完整平行 XCTest **395 passed／0 failed／4 預期 opt-in skips**，clean Debug／Release build、`git diff --check` 通過。Late success 在 disable 後不能復活，old completion 不能覆寫已完成的 new generation，20 個 overlapping callers 僅一次 source acquisition；caller cancellation 保留其他 callers，queued activity disable 不發 RPC 且保留 active quota。Production assembly startup/enable 零 activity I/O、service shutdown 保留 quota transport、只有 consent Bool 新 persistence 均由 deterministic tests 驗證。
+
+獨立 opt-in Live M2 production-style service probe **1 passed／0 skipped**，隔離設定 domain、明確 enable、on-demand refresh 得到 **56 buckets**（只報 count，未輸出 token 值），store/returned snapshot 相符、排序通過；quota→activity→quota 共用 **1 child／1 stdout reader**，disable 清 store、disabled refresh 不進 transport，service shutdown 不關閉 quota，最終 client shutdown 後 child 已 reap、reader = 0。隨後另行執行既有 Live Codex quota test **1 passed／0 skipped**（packaged ChatGPT runtime）。未做效能 soak、manual UI、通知送達、簽章/notarization/distribution；沒有 M3+ model/view/query 或新設定 UI。
+
+**FINAL STATUS：READY TO IMPLEMENT v0.3 M3。** M2 gates 已完成；不是 v0.3 已通過 release gates 或已承諾發行。

@@ -157,7 +157,7 @@ Milestone 1 的 `MockUsageProvider` 使用固定規則產生 Codex 與 Claude Co
 
 此 method 與欄位已有 OpenAI 文件，並由 Codex 管理驗證狀態。QuotaMew 不得讀取 `~/.codex/auth.json` 或複製 token。Adapter 必須清楚呈現找不到執行檔、尚未登入、不提供 ChatGPT 訂閱額度的 API-key-only 模式、protocol 不相容、timeout 與 payload 格式錯誤。
 
-目前實作採單一、按需建立且健康時重用的 app-server。`CodexAppServerClient` 明確持有一個 request slot，涵蓋 write、wait、method-aware decode 與必要 cleanup；各 method 最多一個 coalesced pending batch，等待中的 quota 優先。Connection 只保留一個 stdout reader task 與一筆 matching response buffer；stderr 直接導向 null device。Quota 保留 5 秒 timeout；v0.3 M0 的內部 `readAccountUsageTransport()` 使用獨立、可注入的 2 秒 timeout，僅重用既有健康 connection，尚無 production activity caller／domain mapping。Caller interests 合計上限 128，超限明確回報 typed capacity error；取消只移除該 caller，最後一個 active interest 撤銷才取消該 RPC。完整 usage server error／payload decoding error 可保留 healthy child，不改 quota diagnostics；quota 保留既有 failure cleanup。每行 stdout 上限仍為 1 MiB。timeout、active cancellation、EOF、oversize、壞 framing、explicit shutdown 或 App termination 仍完整關閉 handles、終止並 reap child；替代 child 必須等待舊 stdout reader 結束。它不讀取 `auth.json`、sessions、logs 或 state databases。
+目前實作採單一、按需建立且健康時重用的 app-server。`CodexAppServerClient` 明確持有一個 request slot，涵蓋 write、wait、method-aware decode 與必要 cleanup；各 method 最多一個 coalesced pending batch，等待中的 quota 優先。Connection 只保留一個 stdout reader task 與一筆 matching response buffer；stderr 直接導向 null device。Quota 保留 5 秒 timeout；v0.3 M0 的內部 `readAccountUsageTransport()` 使用獨立、可注入的 2 秒 timeout，僅重用既有健康 connection；M1 adapter 與 M2 service 的按需 opt-in 路徑見下節。Caller interests 合計上限 128，超限明確回報 typed capacity error；取消只移除該 caller，最後一個 active interest 撤銷才取消該 RPC。完整 usage server error／payload decoding error 可保留 healthy child，不改 quota diagnostics；quota 保留既有 failure cleanup。每行 stdout 上限仍為 1 MiB。timeout、active cancellation、EOF、oversize、壞 framing、explicit shutdown 或 App termination 仍完整關閉 handles、終止並 reap child；替代 child 必須等待舊 stdout reader 結束。它不讀取 `auth.json`、sessions、logs 或 state databases。
 
 本機以 ChatGPT.app 內建的 `codex-cli 0.149.0-alpha.4.3` 做過 sanitized live probe，確認 method 與欄位型別可用。Production locator 先檢查標準位置及 `NSWorkspace` 發現的 `ChatGPT.app/Contents/Resources/codex`，再回退舊 `Codex.app`、常見獨立 CLI locations 與 GUI process 繼承的受限 `PATH`。ChatGPT.app 與舊 Codex.app 目前共用 `com.openai.codex`，因此 bundle identifier 只用於取得候選位置；locator 還會驗證 bundle 名稱、一般可執行檔與受信任路徑祖先。成功來源只在記憶體快取，每次使用前重新驗證，失效就重新探索。此 runtime path 仍是 app bundle packaging detail，需透過安全 fallback 與跨版本測試持續驗證；使用者 override 尚未實作。
 
@@ -175,9 +175,19 @@ Codex session event 可能包含 `primary` 與 `secondary` 視窗的使用百分
 
 ### v0.3 M1 — 獨立 Codex Account Activity boundary（2026-10-02）
 
-`TokenActivitySource.id`／`fetchActivity() async throws -> ActivityFetchResult` 與 `UsageProvider` 完全獨立。`CodexTokenActivitySource` 只透過注入的 M0 `readAccountUsageTransport()` 讀取 `account/usage/read`，不傳 `threadId`、不建立 client、不觸發 quota refresh。此 adapter 尚未接入 `AppDependencies` 或任何 production caller；memory store、service、Settings、排程、query 與 UI 留給後續 milestones。
+`TokenActivitySource.id`／`fetchActivity() async throws -> ActivityFetchResult` 與 `UsageProvider` 完全獨立。`CodexTokenActivitySource` 只透過注入的 M0 `readAccountUsageTransport()` 讀取 `account/usage/read`，不傳 `threadId`、不建立 client、不觸發 quota refresh。M1 階段未接入 production；M2 已加入下節的 memory store/service、consent 與共用 client 組裝。Query/model/UI 留給後續 milestones。
 
 Normalized domain 僅含 `ProviderCalendarDate`、非負 `Int64` 的 `ActivityBucket.reportedTokens`，以及單次讀取的 provider／靜態 provenance／`capturedAt`／bounded buckets。日期為合法 Gregorian 10-byte ASCII `YYYY-MM-DD`，不轉為 instant、不套用時區；最多 366 原始 entries，依日期遞增排序、相同重複去重、衝突拒絕。Explicit zero、未回報日期、missing／null／empty collection 維持不同語意。Missing/null/empty 回傳帶原因與成功擷取時間的 `.noDailyBuckets`，method-not-found 為獨立 `.unsupported`，其他失敗為無 raw message 的 `ActivityFetchError`。DTO 不解碼或保留 summary、threadUsage、帳號／模型／專案 metadata；所有候選 core fields 完整驗證後才發出 snapshot。詳細契約與 deterministic／sanitized live gates 見 [v0.3 架構](docs/V0_3_DAILY_USAGE_ARCHITECTURE.md)。既有 quota mapping、transport gate、timeout／cleanup、release metadata 均保持不變。
+
+### v0.3 M2 — 記憶體活動服務與生命週期（2026-10-02）
+
+`AppDependencies.makeRuntime()` 現在只建立一個 `CodexAppServerClient`，同時注入 quota `CodexProvider` 與獨立 `CodexTokenActivitySource`。Runtime 持有 actor `ActivityService` 與 actor `ActivitySnapshotStore`；quota path、AppModel、RefreshCoordinator、通知與 UI 沒有 activity state 或自動呼叫。Transport 仍由既有 client 內 `CodexConnectionLifecycle` 負責 termination/deinit/explicit shutdown 的 pipe、child reaping 與 reader cleanup；ActivityService 不關閉共用 client。應用程式終止即丟棄 activity memory。
+
+Store 只留每 provider 一份 current normalized snapshot，完整替換、不合併日期、不追加 history；另有 transient generation publication fence，沒有 status/error/raw DTO/account identity。Service 純按需 `refresh(provider:)`，每 provider 一個 shared task；caller cancellation 不取消共用 acquisition，而是在 bounded operation 完成後回 cancellation。Explicit `invalidate(provider:)`、disable 或 service `shutdown()` 撤銷 generation、取消 owned work 並清 store，late completion 無法重新發布。每次 refresh 開始先清舊值；unsupported、noDailyBuckets、unavailable、invalidData、failure、timeout 都清空，因為無法證明帳號連續性，不能沿用 quota stale policy。Service outcomes 沿用 `ActivityFetchResult`，僅增加 typed disabled/unavailable/failed；source 語意不變。
+
+SettingsStore 唯一新 persistence 為 `activity.codex.account.enabled` Bool；fresh/existing/missing/corrupt 均 default false，拒絕 UserDefaults 字串／數字 coercion。Service 在 source I/O 前與 publication 前再檢查 consent + Codex provider eligibility；enable 不 fetch，disable 經 service transition 立即 clear/invalidate。沒有 token persistence、timer、polling、startup activity request、quota piggyback、ActivityModel 或使用者介面。
+
+M2 提供 future account/runtime lifecycle 的保守 invalidation API，沒有新增 identity read 或 connection observer。M0 RPC generation 不是 connection/account identity；quota-only reconnect 不會主動 invalidate idle store，M3 接 UI 前需補 display/demand lifecycle。每次 activity refresh 全份替換／失敗清值，不宣稱能偵測所有外部帳號切換。實作與分層驗證詳見 [v0.3 架構](docs/V0_3_DAILY_USAGE_ARCHITECTURE.md)。
 
 ## 7. Claude Code 資料來源評估
 

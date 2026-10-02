@@ -70,4 +70,8 @@ enum ActivityFetchResult: Equatable, Sendable {
     case snapshot(ProviderActivitySnapshot)
     case noDailyBuckets(source: ActivitySource, capturedAt: Date, reason: NoDailyBucketsReason)
     case unsupported
+    // Application outcomes share the source contract; no raw errors reach consumers.
+    case disabled
+    case unavailable(ActivityFetchError)
+    case failed(ActivityFetchError)
 }

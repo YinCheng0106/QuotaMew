@@ -14,6 +14,8 @@ enum AppRuntimeEnvironment {
 enum AppDependencies {
     struct Runtime {
         let appModel: AppModel
+        let activityService: ActivityService
+        let activityStore: ActivitySnapshotStore
         let settingsModel: SettingsModel
     }
 
@@ -48,9 +50,19 @@ enum AppDependencies {
         return model
     }
 
-    static func makeRuntime() -> Runtime {
-        let providers = makeLiveProviders()
-        let settingsStore = SettingsStore()
+    static func makeRuntime(
+        settingsStore: SettingsStore = SettingsStore(),
+        codexClient: CodexAppServerClient? = nil
+    ) -> Runtime {
+        let client = codexClient ?? CodexAppServerClient(locator: CodexExecutableLocator())
+        let providers: [any UsageProvider] = [
+            CodexProvider(reader: client, runtimeDiagnosticReader: client), ClaudeProvider(),
+        ]
+        let activityStore = ActivitySnapshotStore()
+        let activityService = ActivityService(
+            sources: [CodexTokenActivitySource(reader: client)],
+            store: activityStore, settings: settingsStore
+        )
         let notificationService = NotificationService(preferences: settingsStore)
         let appModel = makeAppModel(
             providers: providers,
@@ -59,6 +71,8 @@ enum AppDependencies {
         )
         return Runtime(
             appModel: appModel,
+            activityService: activityService,
+            activityStore: activityStore,
             settingsModel: SettingsModel(
                 store: settingsStore,
                 appModel: appModel,

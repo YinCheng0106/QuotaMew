@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import CoreFoundation
 
 struct NotificationPreferences: Equatable, Sendable {
     var isEnabled: Bool
@@ -86,6 +87,7 @@ final class SettingsStore: AppPreferencesProviding {
         static let onboardingState = "onboarding.state"
         static let onboardingLastCompletedVersion = "onboarding.last-completed-version"
         static let resetIntelligenceEnabled = "reset-intelligence.enabled"
+        static let codexAccountActivityEnabled = "activity.codex.account.enabled"
     }
 
     private let defaults: UserDefaults
@@ -109,6 +111,7 @@ final class SettingsStore: AppPreferencesProviding {
     private(set) var onboardingState: OnboardingState
     private(set) var onboardingLastCompletedVersion: Int
     private(set) var isResetIntelligenceEnabled: Bool
+    private(set) var isCodexAccountActivityEnabled: Bool
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -196,6 +199,20 @@ final class SettingsStore: AppPreferencesProviding {
             defaults.set(OnboardingState.neverShown.rawValue, forKey: Key.onboardingState)
         }
         isResetIntelligenceEnabled = Self.bool(defaults, key: Key.resetIntelligenceEnabled, defaultValue: false)
+        // UserDefaults.bool coerces strings/numbers. Consent accepts a real Bool only.
+        let consent = defaults.object(forKey: Key.codexAccountActivityEnabled) as? NSNumber
+        isCodexAccountActivityEnabled = consent.map {
+            CFGetTypeID($0) == CFBooleanGetTypeID() && $0.boolValue
+        } ?? false
+    }
+
+    func isActivityEnabled(_ providerID: ProviderID) -> Bool {
+        providerID == .codex && isCodexAccountActivityEnabled && isProviderEnabled(providerID)
+    }
+
+    func setCodexAccountActivityEnabled(_ enabled: Bool) {
+        isCodexAccountActivityEnabled = enabled
+        defaults.set(enabled, forKey: Key.codexAccountActivityEnabled)
     }
 
     var notificationPreferences: NotificationPreferences {
