@@ -82,6 +82,14 @@ Latest 表示最新來源日期；7D／30D 沿用 M3 的 source calendar range�
 
 英文／繁體中文由既有 String Catalog 提供，使用 semantic colors，合成 previews 不啟動 provider。自動與 live 驗證、人工外觀／VoiceOver 待驗收狀態見 [`docs/V0_3_DAILY_USAGE_ARCHITECTURE.md`](docs/V0_3_DAILY_USAGE_ARCHITECTURE.md#23-m4-介面與驗收)。
 
+### v0.3 M5 — Shared transport continuity（2026-10-03）
+
+Production `AppDependencies.makeRuntime()` 仍只建立一個 `CodexAppServerClient`，同時注入 quota provider 與 Account Activity source。Client 的 connection generation 是不持久化、不含帳號身分的生命週期計數；它在建立 connection 與失去連續性時遞增。Reader EOF、壞 framing、timeout／取消造成的 disconnect、quota-only reconnect、替換與 explicit shutdown 會經單一失效 callback 清除共享 `ActivityModel` 的可見投影，並使 `ActivityService` 清除 memory snapshot。回呼不要求新的活動擷取，也不修改 quota 的 mapping、排程、backoff 或通知。ActivityService 不擁有 transport shutdown。
+
+單一 continuity barrier 會等待失效回呼與 memory clearing 完成後才釋放 active slot／啟動後續 RPC；舊 reader 回呼以 connection ID 排除，舊 child 必須先 reaped 才建立 replacement。這避免舊 connection 的延遲清除與新 connection 的活動結果交錯；不新增 task chain 或背景輪詢。
+
+失去 connection continuity 只代表舊 Account Activity 不再有資格顯示，**不代表帳號已變更**；目前仍無隱私安全且穩定的帳號識別訊號，不能偵測所有外部靜默切換。重新顯示數值需在健康的新 connection 上由明確 Activity 互動成功擷取；Settings 僅持久化 consent Bool。M2／M3 段落保留當時實作狀態，以上為目前實作的後續修正。
+
 ### v0.2 Product Polish（2026-09-07，COMPLETE，尚未發行）
 
 額度名稱只有一個來源：`UsageWindowPresentation`。精確 duration 18,000 秒對應 `5-hour`／`5 小時`，604,800 秒對應 `Weekly`／`每週`，未知／缺少／無效 duration 使用通用名稱；不由 array position、primary/secondary 或倒數推論，也不把 raw provider label 顯示給使用者。Dashboard row、VoiceOver header 及 approaching/completed notification 文案都共用此 formatter；`UsagePresentation` 繼續只負責 Remaining／Used 百分比。Domain ID、label、duration、reset/cycle metadata 保持原值；`LocalResetDetector` 不參與本地化。

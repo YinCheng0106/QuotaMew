@@ -72,6 +72,9 @@ enum AppDependencies {
         )
         let activityModel = ActivityModel(service: activityService, providerID: .codex,
                                           initiallyEnabled: settingsStore.isActivityEnabled(.codex))
+        client.setActivityInvalidationHandler { [weak activityModel] in
+            await activityModel?.transportDidInvalidate()
+        }
         return Runtime(
             appModel: appModel,
             activityService: activityService,

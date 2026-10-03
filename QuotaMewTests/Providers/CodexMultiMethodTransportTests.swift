@@ -182,6 +182,85 @@ final class CodexMultiMethodTransportTests: XCTestCase {
         } catch { await server.close(); throw error }
     }
 
+    func testExactResponseByteLimitAcceptsValidEnvelopeAndRejectsNextByte() async throws {
+        let limit = 1_048_576 // Match the production limit without increasing it.
+        let server = try ScriptedCodexServer(maximumResponseBytes: limit)
+        do {
+            let valid = Task { try await server.client.readRateLimits() }
+            let event = try await server.nextRequest()
+            XCTAssertEqual(event.method, "account/rateLimits/read")
+            try server.send(action: "valid-production-boundary")
+            let validResult = try await valid.value
+            XCTAssertEqual(validResult.rateLimits?.primary?.usedPercent, 25)
+
+            let oversized = Task { try await server.client.readRateLimits() }
+            _ = try await server.nextRequest()
+            try server.send(action: "oversized-production-boundary")
+            do { _ = try await oversized.value; XCTFail("Expected byte-bound rejection") }
+            catch { XCTAssertEqual(error as? CodexAppServerError, .responseTooLarge) }
+            _ = try await server.quota()
+            await server.close()
+        } catch { await server.close(); throw error }
+    }
+
+    func testRepeatedActivityFailureMatrixAlwaysLeavesQuotaRecoverable() async throws {
+        let server = try ScriptedCodexServer(activityTimeout: .milliseconds(150))
+        let sequence = ["success", "error", "success", "timeout", "success", "malformed",
+                        "success", "oversized", "success", "eof", "success", "cancel", "success"]
+        do {
+            _ = try await server.quota()
+            for action in sequence {
+                let activity = Task { try await server.client.readAccountUsageTransport() }
+                let event = try await server.nextRequest()
+                XCTAssertEqual(event.method, "account/usage/read")
+                XCTAssertFalse(event.overlap)
+                switch action {
+                case "success": try server.reply(fixture: "valid-usage")
+                case "error": try server.send(action: "error")
+                case "malformed": try server.reply(fixture: "malformed-usage")
+                case "oversized", "eof": try server.send(action: action)
+                case "cancel": activity.cancel()
+                case "timeout": break
+                default: XCTFail("Unexpected fixture action")
+                }
+                if action == "success" {
+                    let result = try await activity.value
+                    XCTAssertNotNil(result.dailyUsageBuckets)
+                } else if action == "cancel" {
+                    await assertCancelled(activity)
+                } else {
+                    let expected: CodexAppServerError = switch action {
+                    case "error": .serverError(code: -32601)
+                    case "timeout": .timeout
+                    case "malformed": .invalidResponse
+                    case "oversized": .responseTooLarge
+                    default: .noResponse
+                    }
+                    do { _ = try await activity.value; XCTFail("Expected synthetic activity failure") }
+                    catch { XCTAssertEqual(error as? CodexAppServerError, expected) }
+                }
+                let quota = try await server.quota()
+                XCTAssertFalse(quota.overlap)
+            }
+
+            let failedQuota = Task { try await server.client.readRateLimits() }
+            let request = try await server.nextRequest()
+            XCTAssertEqual(request.method, "account/rateLimits/read")
+            try server.send(action: "error")
+            do { _ = try await failedQuota.value; XCTFail("Expected synthetic quota failure") }
+            catch { XCTAssertEqual(error as? CodexAppServerError, .serverError(code: -32601)) }
+            do { _ = try await server.client.readAccountUsageTransport(); XCTFail("Activity cannot restart transport") }
+            catch { XCTAssertEqual(error as? CodexAppServerError, .noResponse) }
+            _ = try await server.quota()
+            let activity = Task { try await server.client.readAccountUsageTransport() }
+            let recovered = try await server.nextRequest()
+            XCTAssertEqual(recovered.method, "account/usage/read")
+            try server.reply(fixture: "valid-usage")
+            _ = try await activity.value
+            await server.close()
+        } catch { await server.close(); throw error }
+    }
+
     func testActivityCannotLaunchOrReconnectAChild() async throws {
         let client = CodexAppServerClient(executableURL: URL(fileURLWithPath: "/no/runtime"))
         do {
@@ -455,6 +534,216 @@ final class CodexMultiMethodTransportTests: XCTestCase {
         } catch { await server.close(); throw error }
     }
 
+    @MainActor
+    func testSecretBackendErrorCannotReachActivityPresentationDiagnosticsOrPersistence() async throws {
+        let server = try ScriptedCodexServer()
+        let name = "M5ErrorPrivacy-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let settings = SettingsStore(defaults: defaults)
+        settings.setCodexAccountActivityEnabled(true)
+        let runtime = AppDependencies.makeRuntime(settingsStore: settings, codexClient: server.client)
+        let secrets = ["private@example.com", "acct-secret", "thread-secret", "session-secret",
+                       "/private/repo", "repo-secret", "SECRET_PROMPT", "SECRET_RAW_JSON"]
+        do {
+            _ = try await server.quota()
+            let valid = Task { try await runtime.activityModel.refresh() }
+            _ = try await server.nextRequest()
+            try server.reply(fixture: "valid-usage")
+            try await valid.value
+            let before = defaults.persistentDomain(forName: name)! as NSDictionary
+            let failed = Task { try await runtime.activityModel.refresh() }
+            let event = try await server.nextRequest()
+            try server.sendLines(["{\"id\":\(event.id),\"error\":{\"code\":12345," +
+                "\"message\":\"\(secrets.joined(separator: " "))\",\"data\":{\"raw\":\"SECRET_RAW_JSON\"}}}"])
+            try await failed.value
+            XCTAssertEqual(runtime.activityModel.state, .failed(.fetchFailed))
+            let stored = await runtime.activityStore.snapshot(for: .codex)
+            XCTAssertNil(stored)
+            let status = ActivityStatePresentation(state: runtime.activityModel.state,
+                                                  locale: Locale(identifier: "en"))
+            let diagnostic = await server.client.runtimeDiagnostic()
+            let texts = [String(reflecting: runtime.activityModel.state), status.title,
+                         status.explanation, status.refreshTitle, String(reflecting: diagnostic),
+                         String(reflecting: defaults.persistentDomain(forName: name))]
+            for secret in secrets {
+                XCTAssertTrue(texts.allSatisfy { !$0.contains(secret) }, "Private sentinel escaped")
+            }
+            XCTAssertEqual(before, defaults.persistentDomain(forName: name)! as NSDictionary)
+            _ = try await server.quota()
+            await runtime.activityService.shutdown()
+            await server.close()
+        } catch { await runtime.activityService.shutdown(); await server.close(); throw error }
+    }
+
+    @MainActor
+    func testQuotaOnlyReconnectInvalidatesVisibleActivityWithoutFetchingAgain() async throws {
+        let server = try ScriptedCodexServer()
+        let name = "M5Continuity-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let settings = SettingsStore(defaults: defaults)
+        settings.setCodexAccountActivityEnabled(true)
+        let runtime = AppDependencies.makeRuntime(settingsStore: settings, codexClient: server.client)
+        do {
+            let first = try await server.quota()
+            let activity = Task { try await runtime.activityModel.refresh() }
+            let activityRequest = try await server.nextRequest()
+            XCTAssertEqual(activityRequest.method, "account/usage/read")
+            XCTAssertEqual(activityRequest.pid, first.pid)
+            try server.reply(fixture: "valid-usage")
+            try await activity.value
+            guard case .available = runtime.activityModel.state else {
+                XCTFail("Expected visible activity before quota-only failure")
+                await server.close()
+                return
+            }
+            let visibleSnapshot = await runtime.activityStore.snapshot(for: .codex)
+            XCTAssertNotNil(visibleSnapshot)
+            let priorGeneration = await server.client.currentConnectionGeneration()
+
+            let failedQuota = Task { try await server.client.readRateLimits() }
+            let failedRequest = try await server.nextRequest()
+            XCTAssertEqual(failedRequest.method, "account/rateLimits/read")
+            try server.send(action: "eof")
+            do { _ = try await failedQuota.value; XCTFail("Expected synthetic EOF") }
+            catch { XCTAssertEqual(error as? CodexAppServerError, .noResponse) }
+
+            XCTAssertEqual(runtime.activityModel.state, .idle)
+            let clearedAfterEOF = await runtime.activityStore.snapshot(for: .codex)
+            XCTAssertNil(clearedAfterEOF)
+            let replacement = try await server.quota()
+            XCTAssertNotEqual(replacement.pid, first.pid)
+            XCTAssertTrue(isReaped(first.pid))
+            XCTAssertEqual(runtime.activityModel.state, .idle)
+            let clearedAfterReconnect = await runtime.activityStore.snapshot(for: .codex)
+            XCTAssertNil(clearedAfterReconnect)
+            let newGeneration = await server.client.currentConnectionGeneration()
+            XCTAssertGreaterThan(newGeneration, priorGeneration)
+            let queue = await server.client.requestQueueCounts()
+            XCTAssertEqual(queue.activity, 0, "Quota reconnect must not trigger activity I/O")
+            await runtime.activityService.shutdown()
+            await server.close()
+        } catch {
+            await runtime.activityService.shutdown()
+            await server.close()
+            throw error
+        }
+    }
+
+    func testReconnectWaitsForContinuityClearingBeforeReplacementRPC() async throws {
+        let server = try ScriptedCodexServer()
+        let gate = ContinuityInvalidationGate()
+        server.client.setActivityInvalidationHandler { await gate.block() }
+        do {
+            _ = try await server.quota()
+            let failed = Task { try await server.client.readAccountUsageTransport() }
+            let old = try await server.nextRequest()
+            try server.send(action: "eof")
+            await gate.waitForEntry()
+            let retry = Task { try await server.client.readRateLimits() }
+            try await waitForQueue(server.client, active: 1, quota: 1, activity: 0)
+            await gate.release()
+            do { _ = try await failed.value; XCTFail("Expected synthetic EOF") }
+            catch { XCTAssertEqual(error as? CodexAppServerError, .noResponse) }
+            let replacement = try await server.nextRequest()
+            XCTAssertNotEqual(replacement.pid, old.pid)
+            XCTAssertTrue(isReaped(old.pid))
+            XCTAssertFalse(replacement.overlap)
+            try server.reply()
+            _ = try await retry.value
+            await server.close()
+        } catch { await gate.release(); await server.close(); throw error }
+    }
+
+    func testBoundedSyntheticReconnectResourcesWhenExplicitlyEnabled() async throws {
+        guard ProcessInfo.processInfo.environment["QUOTAMEW_RUN_ACTIVITY_RESOURCE_TEST"] == "1" else {
+            throw XCTSkip("Opt-in bounded Release reconnect resource harness disabled")
+        }
+        let baseline = try M5ResourceSample.capture()
+        let server = try ScriptedCodexServer()
+        var lines = [baseline.line("reconnect_baseline")]
+        do {
+            _ = try await server.quota()
+            for index in 0..<100 {
+                let activity = Task { try await server.client.readAccountUsageTransport() }
+                let old = try await server.nextRequest()
+                let action = ["framing", "oversized", "eof", "cancel"][index % 4]
+                if action == "cancel" { activity.cancel() }
+                else { try server.send(action: action) }
+                if action == "cancel" { await assertCancelled(activity) }
+                else {
+                    do { _ = try await activity.value; XCTFail("Expected synthetic stream failure") }
+                    catch {
+                        let expected: CodexAppServerError = action == "framing" ? .invalidResponse
+                            : action == "oversized" ? .responseTooLarge : .noResponse
+                        XCTAssertEqual(error as? CodexAppServerError, expected)
+                    }
+                }
+                let replacement = try await server.quota()
+                XCTAssertTrue(isReaped(old.pid))
+                XCTAssertNotEqual(old.pid, replacement.pid)
+                XCTAssertFalse(replacement.overlap)
+                if (index + 1).isMultiple(of: 25) {
+                    let sample = try M5ResourceSample.capture()
+                    lines.append(sample.line("reconnects_\(index + 1)"))
+                    XCTAssertEqual(sample.children, baseline.children + 1)
+                    XCTAssertEqual(RuntimeDiagnostics.shared.snapshot().codexStdoutReaderCount, 1)
+                }
+            }
+            await server.close()
+            let after = try M5ResourceSample.capture()
+            lines.append(after.line("reconnect_teardown"))
+            XCTAssertLessThanOrEqual(after.descriptors, baseline.descriptors + 4)
+            XCTAssertLessThanOrEqual(after.threads, baseline.threads + 8)
+            XCTAssertEqual(after.children, baseline.children)
+            XCTAssertEqual(RuntimeDiagnostics.shared.snapshot().codexStdoutReaderCount, 0)
+            M5ResourceSample.report(lines, in: self)
+        } catch { await server.close(); throw error }
+    }
+
+    @MainActor
+    func testIdleEOFInvalidatesVisibleActivityBeforeAnotherRequest() async throws {
+        let server = try ScriptedCodexServer()
+        let name = "M5IdleEOF-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        let settings = SettingsStore(defaults: defaults)
+        settings.setCodexAccountActivityEnabled(true)
+        let runtime = AppDependencies.makeRuntime(settingsStore: settings, codexClient: server.client)
+        do {
+            _ = try await server.quota()
+            let activity = Task { try await runtime.activityModel.refresh() }
+            _ = try await server.nextRequest()
+            try server.reply(fixture: "valid-usage")
+            try await activity.value
+            guard case .available = runtime.activityModel.state else {
+                XCTFail("Expected activity before synthetic idle EOF")
+                await server.close()
+                return
+            }
+            try server.send(action: "eof")
+            let clock = ContinuousClock()
+            let deadline = clock.now.advanced(by: .seconds(5))
+            while runtime.activityModel.state != .idle && clock.now < deadline { await Task.yield() }
+            XCTAssertEqual(runtime.activityModel.state, .idle)
+            var cleared = await runtime.activityStore.snapshot(for: .codex)
+            while cleared != nil && clock.now < deadline {
+                await Task.yield()
+                cleared = await runtime.activityStore.snapshot(for: .codex)
+            }
+            XCTAssertNil(cleared)
+            let queue = await server.client.requestQueueCounts()
+            XCTAssertEqual(queue.activity, 0)
+            await runtime.activityService.shutdown()
+            await server.close()
+        } catch {
+            await runtime.activityService.shutdown()
+            await server.close()
+            throw error
+        }
+    }
+
     func testCorrelationDiscardsWrongIDsNotificationsAndMalformedUnrelatedPayloads() async throws {
         let server = try ScriptedCodexServer()
         do {
@@ -523,6 +812,32 @@ private func assertCancelled<Value: Sendable>(_ task: Task<Value, Error>,
 
 private enum FixtureError: Error { case deadline, pipe, noRequest }
 
+private actor ContinuityInvalidationGate {
+    private var entered = false
+    private var released = false
+    private var blocked: CheckedContinuation<Void, Never>?
+    private var entryWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func block() async {
+        guard !released else { return }
+        entered = true
+        entryWaiters.forEach { $0.resume() }
+        entryWaiters.removeAll()
+        await withCheckedContinuation { blocked = $0 }
+    }
+
+    func waitForEntry() async {
+        if entered { return }
+        await withCheckedContinuation { entryWaiters.append($0) }
+    }
+
+    func release() {
+        released = true
+        blocked?.resume()
+        blocked = nil
+    }
+}
+
 private func waitForQueue(_ client: CodexAppServerClient, active: Int, quota: Int, activity: Int) async throws {
     let clock = ContinuousClock()
     let deadline = clock.now.advanced(by: .seconds(5))
@@ -558,7 +873,7 @@ private final class ScriptedCodexServer: @unchecked Sendable {
             .appending(path: "Fixtures/CodexTransport")
     }
 
-    init(activityTimeout: Duration = .seconds(2)) throws {
+    init(activityTimeout: Duration = .seconds(2), maximumResponseBytes: Int = 4096) throws {
         directory = FileManager.default.temporaryDirectory.appending(path: "CodexM0-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let controlURL = directory.appending(path: "control")
@@ -575,7 +890,7 @@ private final class ScriptedCodexServer: @unchecked Sendable {
         client = CodexAppServerClient(
             executableURL: URL(fileURLWithPath: "/usr/bin/python3"),
             arguments: ["-u", Self.fixtures.appending(path: "server.py").path, controlURL.path, eventsURL.path],
-            timeout: .seconds(5), activityTimeout: activityTimeout, maximumResponseBytes: 4096
+            timeout: .seconds(5), activityTimeout: activityTimeout, maximumResponseBytes: maximumResponseBytes
         )
     }
 

@@ -47,6 +47,7 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
     private let activityTimeout: Duration
     private let maximumResponseBytes: Int
     private let lifecycle: CodexConnectionLifecycle
+    private let activityInvalidation = CodexActivityInvalidationRelay()
 
     private struct RequestBatch {
         let generation: UInt64
@@ -56,6 +57,9 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
     }
 
     private var nextRequestID = firstRequestID
+    private var connectionGeneration: UInt64 = 0
+    private var connectionID: UUID?
+    private var continuityBarrier: Task<Void, Never>?
     private var nextRequestGeneration: UInt64 = 1
     private var activeRequest: RequestBatch?
     private var pendingQuota: RequestBatch?
@@ -64,6 +68,12 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
     private var hasStartedAppServerProcess = false
     private var lastRequestSucceeded = false
     private var lastFailureCategory: DiagnosticFailureCategory?
+
+    nonisolated func setActivityInvalidationHandler(_ handler: @escaping @Sendable () async -> Void) {
+        activityInvalidation.set(handler)
+    }
+
+    func currentConnectionGeneration() -> UInt64 { connectionGeneration }
 
     init(
         executableURL: URL,
@@ -185,7 +195,10 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
         pendingQuota = nil
         pendingActivity = nil
         if let connection = lifecycle.beginShutdown() {
+            connectionID = nil
+            let invalidation = beginActivityContinuityInvalidation()
             await connection.stop()
+            await invalidation.value
         }
         await task?.value
     }
@@ -256,11 +269,12 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
             let result: Result<CodexTransportResult, Error>
             do { result = .success(try await performRequest(batch.method)) }
             catch { result = .failure(error) }
-            finishRequest(generation: batch.generation, result: result)
+            await finishRequest(generation: batch.generation, result: result)
         }
     }
 
-    private func finishRequest(generation: UInt64, result: Result<CodexTransportResult, Error>) {
+    private func finishRequest(generation: UInt64, result: Result<CodexTransportResult, Error>) async {
+        await continuityBarrier?.value
         guard let batch = activeRequest, batch.generation == generation else { return }
         // performRequest has cleared correlation and fully awaited any reader/process cleanup.
         activeRequest = nil
@@ -291,6 +305,8 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
     #endif
 
     private func performRequest(_ method: CodexRequestMethod) async throws -> CodexTransportResult {
+        // A lost connection clears activity before any replacement RPC can begin.
+        await continuityBarrier?.value
         try Task.checkCancellation()
         let connection: ManagedCodexConnection
         if method == .rateLimits {
@@ -339,7 +355,10 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
         }
 
         if let staleConnection = lifecycle.takeConnection() {
+            connectionID = nil
+            let invalidation = beginActivityContinuityInvalidation()
             await staleConnection.stop()
+            await invalidation.value
         }
         try Task.checkCancellation()
 
@@ -375,11 +394,15 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
         RuntimeDiagnostics.shared.codexProcessStarted(process.processIdentifier)
         #endif
 
+        let newConnectionID = UUID()
         let connection = ManagedCodexConnection(
             process: process,
             input: standardInput.fileHandleForWriting,
             output: standardOutput.fileHandleForReading,
-            maximumResponseBytes: maximumResponseBytes
+            maximumResponseBytes: maximumResponseBytes,
+            onReaderFinished: { [weak self] in
+                Task { await self?.readerFinished(connectionID: newConnectionID) }
+            }
         )
 
         do {
@@ -388,6 +411,8 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
                 await connection.stop()
                 throw CancellationError()
             }
+            connectionID = newConnectionID
+            connectionGeneration &+= 1
             #if DEBUG
             RuntimeDiagnostics.shared.codexConnectionBecameHealthy(
                 processID: connection.processIdentifier
@@ -427,8 +452,28 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
     }
 
     private func disconnect(_ connection: ManagedCodexConnection) async {
-        lifecycle.remove(connection)
+        let wasCurrent = lifecycle.remove(connection)
+        if wasCurrent { connectionID = nil }
+        let invalidation = wasCurrent ? beginActivityContinuityInvalidation() : nil
         await connection.stop()
+        await invalidation?.value
+    }
+
+    private func readerFinished(connectionID finishedID: UUID) async {
+        guard connectionID == finishedID, let connection = lifecycle.takeConnection() else { return }
+        connectionID = nil
+        let invalidation = beginActivityContinuityInvalidation()
+        await connection.stop()
+        await invalidation.value
+    }
+
+    private func beginActivityContinuityInvalidation() -> Task<Void, Never> {
+        connectionGeneration &+= 1
+        let handler = activityInvalidation.handler
+        let task = Task { if let handler { await handler() } }
+        // One bounded barrier, replaced after each ended connection; no task chain.
+        continuityBarrier = task
+        return task
     }
 
     private static func failureCategory(for error: Error) -> DiagnosticFailureCategory? {
@@ -443,6 +488,17 @@ actor CodexAppServerClient: CodexRateLimitsReading, CodexRuntimeDiagnosticReadin
         case .responseTooLarge, .invalidResponse, .serverError, .requestCapacityExceeded:
             return .rpcUnavailable
         }
+    }
+}
+
+private final class CodexActivityInvalidationRelay: @unchecked Sendable {
+    private let lock = NSLock()
+    private var callback: (@Sendable () async -> Void)?
+
+    var handler: (@Sendable () async -> Void)? { lock.withLock { callback } }
+
+    func set(_ handler: @escaping @Sendable () async -> Void) {
+        lock.withLock { callback = handler }
     }
 }
 
@@ -527,10 +583,11 @@ private final class CodexConnectionLifecycle: @unchecked Sendable {
         return installation.accepted
     }
 
-    func remove(_ connection: ManagedCodexConnection) {
+    func remove(_ connection: ManagedCodexConnection) -> Bool {
         lock.withLock {
-            guard currentConnection === connection else { return }
+            guard currentConnection === connection else { return false }
             currentConnection = nil
+            return true
         }
     }
 
@@ -597,7 +654,8 @@ private final class ManagedCodexConnection: @unchecked Sendable {
         process: Process,
         input: FileHandle,
         output: FileHandle,
-        maximumResponseBytes: Int
+        maximumResponseBytes: Int,
+        onReaderFinished: @escaping @Sendable () -> Void
     ) {
         self.process = process
         self.input = input
@@ -617,6 +675,7 @@ private final class ManagedCodexConnection: @unchecked Sendable {
                 expectedResponse: expectedResponse,
                 continuation: channel.continuation
             )
+            onReaderFinished()
         }
 
         #if DEBUG

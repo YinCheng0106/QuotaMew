@@ -29,6 +29,14 @@ while True:
                     sys.exit(0)
                 if action == "oversized":
                     print("x" * 4097, flush=True)
+                elif action == "valid-production-boundary":
+                    prefix = '{"id":%d,"result":{"rateLimits":{"primary":{"usedPercent":25}},"future":"' % active["id"]
+                    suffix = '"}}'
+                    response = prefix + "x" * (1_048_576 - len(prefix) - len(suffix)) + suffix
+                    assert len(response.encode()) == 1_048_576
+                    print(response, flush=True)
+                elif action == "oversized-production-boundary":
+                    print("x" * 1_048_577, flush=True)
                 elif action == "framing":
                     print("not-json", flush=True)
                 elif action == "lines":

@@ -484,3 +484,66 @@ M4 只交付此 presentation milestone；未加入 persistent history、成本�
 最終 gate logs 保留在隔離暫存路徑：`/tmp/QuotaMew-M4-regression.log`、`/tmp/QuotaMew-M4-full-verified.log`、`/tmp/QuotaMew-M4-clean-debug.log`、`/tmp/QuotaMew-M4-clean-release.log`、`/tmp/QuotaMew-M4-live-activity.log`、`/tmp/QuotaMew-M4-live-quota.log`。Live 只列 bucket／coverage counts 與 PASS flags；這些暫存檔案不 commit，不是 activity history persistence。初次測試抓到 native hosting minimum 設定順序與 fixture yield 等待競態，均修正並以最終全 suite 零失敗確認。
 
 **M4 COMPLETE — MANUAL ACCEPTANCE COMPLETE; READY FOR v0.3 M5**
+
+## M5 reliability／privacy／resource checkpoint（2026-10-03）
+
+本 checkpoint 僅涵蓋 v0.3 feature hardening；不是 v0.3 發行、signing／notarization／distribution 驗證，也不開始 M6。M4 人工外觀／VoiceOver 驗收維持上方獨立紀錄；M5 自動 smoke 不取代人工驗收。
+
+### 發現與最小修正
+
+**HIGH — quota-only reconnect 可能保留不可信的舊 Account Activity。** 原本 Activity 清除依賴明確 Activity refresh／disable，quota 自己造成斷線與 replacement 時沒有進入 Activity generation／memory clearing。現在共享 client 在 reader EOF、壞 framing、timeout／active cancellation、stale replacement 與 shutdown 經單一 callback 失效 Activity；runtime 以弱參照綁定共用 model，沿用既有 model／service／store invalidate。這刻意改變 connection continuity 中斷時的 Activity 顯示清除政策，不更動 quota mapping、Remaining／Used、Luna Reserve、cadence／backoff、stale threshold、reset detection、notification 或 pin semantics。
+
+Connection generation 為不含身分、不持久化的 UInt64；短暫 connection UUID 排除舊 reader callback。單一 continuity barrier 等待 model／store 清除後才釋放 active slot／啟動後續 RPC；舊 child reaped 才可建立 replacement。Barrier 不串成 task chain、不要求 Activity 擷取，ActivityService 仍不擁有 client shutdown。Idle EOF 與 quota-only reconnect 都有 production-style runtime 回歸；明確 gate 證明 clearing 未完成時 replacement RPC 不開始。
+
+### 可靠性、隱私與 I/O
+
+| 項目 | 最終證據 |
+| --- | --- |
+| 共用所有權 | Production makeRuntime 只有 1 Codex client、ActivityModel／service／store；quota／Activity source 共用 client。實際 Release 結構檢查各只有 1，status item／window controller 各 1 |
+| Active RPC／quota 優先 | max active 1；5 輪 active Activity 25 callers＋waiting quota 32＋waiting Activity 32（取消 16），quota 下一個先執行、各 queues 最終 0；Activity timeout 維持 2 秒 |
+| Failure／recovery | success→method-not-found→success→timeout→success→malformed→success→oversized→success→EOF→success→cancel→success；各次 fixture 允許的 quota 均成功。Quota failure 後 Activity 不自行 reconnect，quota 恢復後 Activity 成功 |
+| Disable／refresh／window | 100 enable／disable（含 late completion）清 model／store、disabled refresh 零 I/O；100 快速 callers 合併 1 acquisition、callers 100→0，既有取消 waiter 不污染共享工作；100 controller＋100 native window 循環，reopen 不擷取、舊 window／host 弱參照全 0 |
+| Relaunch | 隔離 Settings domain、synthetic snapshot、shutdown、重建 runtime-like store／service／model；consent true，enabled／idle、snapshot 空、source reads 0 |
+| Persistence inventory | 唯一 Activity app-managed persisted state：嚴格 Bool activity.codex.account.enabled。UserDefaults／SettingsStore、file／Codable writes、SQLite／SwiftData／Core Data／CloudKit、logs／diagnostics／pasteboard／state restoration 均無 Activity values／dates／snapshot／capturedAt／coverage／identity writes；quota notification state 獨立 |
+| Error privacy | Secret-bearing transport→source→service→model 測試僅得到 typed failed.fetchFailed，舊 snapshot 清除；UI／AX 共用 presentation、diagnostics／settings 無 email／account／thread／session／workspace／repo／prompt／raw payload sentinels；quota afterward 成功 |
+| Layered bounds | 1,048,576-byte valid envelope 接受、1,048,577 拒絕且 quota 恢復；366 buckets 在 dedup 前檢查；Latest／7D／30D projections 有界；未知 future 欄位忽略、不保留 raw response |
+| Startup zero I/O | Runtime／Dashboard／Settings construction、Settings system／diagnostics refresh、consent enable、背景 quota refresh 均 0 Activity I/O；enabled／idle window 首次明確開啟只有 1 coalesced acquisition。無 Activity timer／polling |
+
+### Release 資源量測
+
+使用本機 macOS／arm64、Release optimization，所有壓力均合成來源。Native scaffold 使用正常 AppKit run loop，複製 app／project 到暫存目錄並只替換複製本 entry point，使用獨立 bundle ID／Settings domain，再由 LaunchServices 開啟；不修改 production entry point／project，也不呼叫 provider。可重現入口為 scripts/profile-m5-activity.sh，fixture 為 scripts/fixtures/M5NativeResourceHarness.swift；以 /bin/bash 執行即可。CPU 為 2 秒 getrusage／ContinuousClock sample，RSS 為 proc_pidinfo resident bytes；以下 MB 採十進位。
+
+| 情境 | 實際量測／判讀 |
+| --- | --- |
+| Synthetic idle | RSS 33.5 MB、CPU 0.09%、FD 3、threads 8、children 0 |
+| Existing snapshot window | RSS 84.5 MB、CPU 0.52%、FD 3、threads 11、children 0 |
+| 100 native close／reopen | 第 25／50／75／100 次 RSS 99.75／100.50／100.58／100.42 MB；每批舊 windows／hosts = 0，FD 3，threads 最後穩定 16。無持續單調成長 |
+| Closed／100 refresh | 關閉後 2 秒 CPU 1.04%（短暫 framework／animation 影響，不當成長期 idle）；settled RSS 96.11 MB，第 25／50／75／100 refresh 均同值，FD 3、threads 15、children 0；總 reads 101、reopen reads 0 |
+| 100 failure／reconnect | Release optimized XCTest＋DEBUG counters／ENABLE_TESTABILITY：baseline 86.8 MB、FD 6／threads 6／children 0；25→100 RSS 114.44→114.74 MB、FD 10／threads 10–11、child／reader 1；100 舊 PIDs 均 reaped、無 overlap；teardown FD 6、threads 10、child／reader 0 |
+
+Hosted XCTest 曾在 main-thread autorelease pool 保留 99 個 native windows，造成 RSS 持續增加。Content-disabled heap reference graph 證明保留根在測試宿主；所有試驗性 production window 修改已撤回，正常 AppKit run loop 量測釋放全部 window／host 並達平台期。未將 allocator caching 或宿主保留誤報成產品洩漏。以上是 bounded regression detection，不是長期 production soak 或整體 idle <50 MB 保證。
+
+### Gates 與驗證邊界
+
+| Gate | 結果 |
+| --- | --- |
+| Targeted suites | 11 個既有 transport／provider／store／service／projection／model／window／consent／status suites：133 passed／0 failed／3 expected opt-in skips（136 total）；context menu 在 StatusItemControllerTests |
+| Full parallel XCTest | 4 workers：448 passed／0 failed／7 expected opt-in skips（455 total）；M0–M4 regressions 全綠。3 個 runtime QoS inversion warnings；無 compiler errors／Swift 6 concurrency warnings |
+| Strict clean Debug／Release | 兩個隔離 DerivedData clean build PASS；code signing disabled。Shell syntax／Python fixture AST／git diff --check PASS，無新增 lint/runtime dependency 或 analyzer 配置 |
+| Live shared transport | 最終明確 opt-in window gate 1 passed／0 skipped；packagedChatGPT runtime、56 buckets、7D 7/7、30D 30/30；2 次明確 Activity fetch、quota before／after PASS、同 1 child／reader；shutdown child reaped、reader 0。未輸出實際 token 值 |
+| Live quota | 活動 gate 後獨立 Debug provider gate 1 passed／0 skipped、2 valid quota windows。一次 Release host 不符合既有 Debug bundle assertion，該次不計成功，修正 host 後通過 |
+| Actual Release LaunchServices smoke | PASS：以 open 啟動隔離 clean Release app，Mach-O SHA256 dea9ebdd17f372d86b4fafe9caa0906a8f062e0f97ecf32f61d38375daa8efc1。同 M5 artifact 的 Dashboard AX 顯示 Codex available、兩個正常 quota windows；另次啟動由使用者從選單開啟 Codex 帳號活動，AX 顯示 disabled 說明／disabled refresh。最後程序 39731、同一 child 39734，開啟 Activity 不新增 child；content-disabled heap 結構確認 client／connection／model／service／store／window controller／Activity host／status item 各 1。Quit 後 app／child 在 5 秒 bound 內皆已 reap，恢復原安裝 app；不算 M4 人工外觀／VoiceOver 再驗收 |
+
+初次與最終 live window gates、quota host 修正合計 4 Activity／6 explicit quota reads，另有 smoke app 既有 startup quota 行為；未用真實 backend 做 stress。實際 response limit fixture 改由 child 接收短指令後產生 1 MiB 回應，避免將巨大測試控制資料寫進 FIFO 造成測試 writer blocking；最終 edge gate PASS。首次人工開啟的是舊 M4 Release，透過程序路徑／Mach-O UUID 核對後排除；完成 smoke 的是上述 M5 clean Release artifact。
+
+主要暫存證據：/tmp/QuotaMew-M5-complete-final.xcresult、/tmp/QuotaMew-M5-targeted-final2.xcresult、/tmp/QuotaMew-M5-boundary-final.xcresult、/tmp/QuotaMew-M5-resource-final2.xcresult、/tmp/QuotaMew-M5-native-final.log、/tmp/QuotaMew-M5-final-live-activity.xcresult、/tmp/QuotaMew-M5-final-live-quota-debug2.xcresult、/tmp/QuotaMew-M5-final-debug.log、/tmp/QuotaMew-M5-final-release.log。這些合成／sanitized 驗證紀錄不是 app-managed Activity history。
+
+### Git、範圍與剩餘限制
+
+起始 main HEAD = 1e93f56c00958c2eabc3088391a316633311706a，origin/main = 3a63921fced7ed7fd68b4ddbc9c5b09e8c97be95（RC.2），ahead 9；唯一本來的 dirty work 為 QuotaMew/Localizable.xcstrings。其 SHA256 = c2d67c222908e979bfece7476675d7562a099a07f96baede57df1fe1b9dfefc2，253 既有 entries 全部語意未改，僅既有新增 Reported tokens／Reported zero／Source date 與排序／序列化差異；M5 前後 hash 一致，新增 delta 0，不納入 commit。
+
+尚無穩定且隱私安全的帳號身分訊號；失去 connection continuity 只使舊 Activity 失效，不代表已證明帳號改變，也不能保證偵測健康連線內所有外部靜默換帳號。重新顯示需要健康 connection 上的明確 Activity 擷取。Memory-only 證據限 app-managed persistence，不對 swap／OS 行為作不存在保證。Activity request 仍可占用共享 active slot 至原 2 秒 timeout；QoS warnings 保留於後續 release-readiness 審查，不藉此更動 quota scheduling。
+
+僅本機 Conventional Commit；無 push／tag／release／版本修改，RC.2／0.2.0／build 5 不變；README／ROADMAP／Fumadocs 不改。沒有新增持久歷史、成本／價格、analytics、burn rate／runway、polling、Activity notifications、widgets、cloud、iPhone、provider、Reset Intelligence 或介面 redesign。
+
+**V0.3 FEATURE HARDENING COMPLETE — READY FOR RELEASE-READINESS AUDIT**

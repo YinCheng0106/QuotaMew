@@ -31,6 +31,61 @@ final class ActivityWindowTests: XCTestCase {
         await f.cleanUp()
     }
 
+    func testHundredWindowOpenCloseCyclesRetainOneSharedModelAndNoExtraReads() async throws {
+        let f = try M4ActivityFixture(enabled: true)
+        var creations = 0
+        let controller = ActivityWindowController(model: f.model, openSettings: {}, activate: {}) { view in
+            XCTAssertTrue(view.model === f.model)
+            creations += 1
+            return M4TestWindow()
+        }
+        for index in 0..<100 {
+            controller.show()
+            await controller.waitForOpenRefresh()
+            XCTAssertTrue(controller.model === f.model)
+            let window = try XCTUnwrap(controller.window)
+            controller.windowWillClose(Notification(name: NSWindow.willCloseNotification, object: window))
+            XCTAssertNil(controller.window)
+            XCTAssertNil(window.contentViewController)
+            XCTAssertEqual(creations, index + 1)
+        }
+        let reads = await f.source.readCount
+        XCTAssertEqual(reads, 1)
+        controller.teardown()
+        await f.cleanUp()
+    }
+
+    func testHundredEnableRefreshDisableCyclesClearMemoryAndKeepConsentBounded() async throws {
+        let f = try M4ActivityFixture()
+        for index in 0..<100 {
+            await f.model.setEnabled(true)
+            XCTAssertEqual(f.model.state, .idle)
+            if index.isMultiple(of: 2) {
+                await f.source.block()
+                let inFlight = Task { try await f.model.refresh() }
+                await f.source.waitForRead()
+                await f.model.setEnabled(false)
+                await f.source.complete()
+                _ = try? await inFlight.value
+            } else {
+                try await f.model.refresh()
+                guard case .available = f.model.state else { return XCTFail("Expected synthetic projection") }
+                await f.model.setEnabled(false)
+            }
+            XCTAssertEqual(f.model.state, .disabled)
+            let cleared = await f.store.snapshot(for: .codex)
+            XCTAssertNil(cleared)
+            try await f.model.refresh()
+        }
+        let reads = await f.source.readCount
+        XCTAssertEqual(reads, 100)
+        XCTAssertFalse(f.settings.isCodexAccountActivityEnabled)
+        let persisted = f.defaults.persistentDomain(forName: f.name) ?? [:]
+        XCTAssertEqual(persisted["activity.codex.account.enabled"] as? Bool, false)
+        XCTAssertEqual(persisted.keys.filter { $0.hasPrefix("activity.") }, ["activity.codex.account.enabled"])
+        await f.cleanUp()
+    }
+
     func testEnabledFirstOpenCoalescesAvailableReopenDoesNotRefetchAndManualDoes() async throws {
         let f = try M4ActivityFixture(enabled: true)
         var creations = 0

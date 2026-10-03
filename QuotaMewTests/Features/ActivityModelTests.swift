@@ -191,6 +191,23 @@ final class ActivityModelTests: XCTestCase {
         await f.cleanUp()
     }
 
+    func testHundredRapidManualRefreshCallersSettleAfterOneAcquisition() async throws {
+        let f = Fixture(enabled: true)
+        let callers = (0..<100).map { _ in Task { try await f.model.refresh() } }
+        await f.source.waitForCalls(1)
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(5))
+        while f.model.refreshCallerCount != 100 && clock.now < deadline { await Task.yield() }
+        XCTAssertEqual(f.model.refreshCallerCount, 100)
+        await f.source.complete(0, .success(.snapshot(try activitySnapshot())))
+        for caller in callers { try await caller.value }
+        XCTAssertEqual(f.model.refreshCallerCount, 0)
+        let calls = await f.source.calls
+        XCTAssertEqual(calls, 1)
+        guard case .available = f.model.state else { return XCTFail("Expected one published projection") }
+        await f.cleanUp()
+    }
+
     func testRapidDisableReenableAndRepeatedEnableFenceOldWork() async throws {
         let f = Fixture(enabled: true)
         let old = Task { try await f.model.refresh() }

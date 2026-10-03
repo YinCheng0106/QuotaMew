@@ -112,6 +112,12 @@ final class ActivityModel {
         _ = await task.value
     }
 
+    /// A replaced or ended shared connection cannot establish account continuity.
+    /// The transport owns the signal; this model clears presentation and service state.
+    func transportDidInvalidate() async {
+        await invalidate()
+    }
+
     private func clearCycle(state: ActivityModelState) {
         generation = UUID()
         refreshTask?.cancel()

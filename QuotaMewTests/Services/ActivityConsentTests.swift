@@ -43,6 +43,37 @@ final class ActivityConsentTests: XCTestCase {
         XCTAssertEqual(before, defaults.persistentDomain(forName: name)! as NSDictionary)
         await service.shutdown()
     }
+
+    func testRelaunchRetainsOnlyConsentAndStartsWithEmptyIdleMemory() async throws {
+        let f = try M4ActivityFixture(enabled: true)
+        let before = f.defaults.persistentDomain(forName: f.name)! as NSDictionary
+        try await f.model.refresh()
+        let populated = await f.store.snapshot(for: .codex)
+        XCTAssertNotNil(populated)
+        XCTAssertEqual(before, f.defaults.persistentDomain(forName: f.name)! as NSDictionary)
+        await f.service.shutdown()
+        let cleared = await f.store.snapshot(for: .codex)
+        XCTAssertNil(cleared)
+
+        let restoredSettings = SettingsStore(defaults: f.defaults)
+        let restoredStore = ActivitySnapshotStore()
+        let restoredSource = M4ActivitySource(result: .snapshot(try activitySnapshot()))
+        let restoredService = ActivityService(sources: [restoredSource], store: restoredStore,
+                                              settings: restoredSettings)
+        let restoredModel = ActivityModel(service: restoredService, providerID: .codex,
+                                          initiallyEnabled: restoredSettings.isActivityEnabled(.codex))
+        XCTAssertTrue(restoredSettings.isCodexAccountActivityEnabled)
+        XCTAssertEqual(restoredModel.state, .idle)
+        let restoredSnapshot = await restoredStore.snapshot(for: .codex)
+        let restoredReads = await restoredSource.readCount
+        XCTAssertNil(restoredSnapshot)
+        XCTAssertEqual(restoredReads, 0)
+        let persisted = f.defaults.persistentDomain(forName: f.name) ?? [:]
+        XCTAssertEqual(persisted.keys.filter { $0.hasPrefix("activity.") }, ["activity.codex.account.enabled"])
+        XCTAssertEqual(persisted["activity.codex.account.enabled"] as? Bool, true)
+        await restoredService.shutdown()
+        await f.cleanUp()
+    }
 }
 
 private struct ImmediateActivitySource: TokenActivitySource {
