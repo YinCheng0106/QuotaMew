@@ -73,7 +73,9 @@ packaging script 不改 Info.plist。
 
 Apple 對 [CFBundleShortVersionString](https://developer.apple.com/documentation/bundleresources/information-property-list/cfbundleshortversionstring)
 要求三段整數；網站的 release SemVer 因而與 bundle version 分別驗證，無語意衝突。
-本階段保留 source `0.2.0` / build `5`，尚未決定 v0.3 beta build。
+Stage 1 當時保留 source `0.2.0` / build `5`。Stage 2 已採用 app core
+`0.3.0` / build `6`，完整政策與候選 gates 見
+[v0.3 beta 準備紀錄](V0_3_BETA_PREPARATION.md)。這不代表 beta 已發行。
 
 ## CLI 與 exact-artifact flow
 

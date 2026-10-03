@@ -8,6 +8,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Planned prerelease: **v0.3.0-beta.1**. Candidate validation and publication are pending.
+
+### New
+
+- Opt-in **Codex Account Activity** in a dedicated window, separate from the existing quota monitor.
+- Latest / 7D / 30D views of daily **provider-reported token activity**, with explicit reported / zero / missing distinctions and coverage visibility.
+- Manual Refresh and Command-R for Account Activity.
+
+### Foundation and reliability
+
+- Shared Codex app-server transport supports quota and Account Activity.
+- Improved connection lifecycle and reconnect handling for Account Activity.
+
+### Privacy
+
+- Account Activity is opt-in. QuotaMew keeps only the currently fetched Activity snapshot in memory and does not persist Activity history.
+- Only the Activity consent setting is app-persisted for this feature. No account or email identity tracking was added.
+
+### Beta limitations
+
+- Provider date timezone, completeness, and retention behavior are controlled by the source and are not fully documented. Latest means the latest reported source date, not “Today”.
+- The in-memory snapshot is replaced by each fetch; QuotaMew does not build permanent local history.
+- Provider-reported token activity is not billing or cost information and is separate from quota/rate-limit windows.
+- If you change the Codex account while the same healthy app-server connection remains alive, the previous Activity snapshot may temporarily remain visible. **Manually Refresh Account Activity after changing accounts.**
+- The planned beta uses Apple Development signing, with no Developer ID signing, notarization, or stapled ticket. macOS may require **System Settings → Privacy & Security → Open Anyway** on first launch. Requires macOS 14 or later. Claude Code remains **Experimental / Unverified**.
+
+### 繁體中文
+
+規劃中的 **v0.3.0-beta.1** 預發行版本，候選驗收與發佈尚未完成。
+
+- 新增需自行啟用的 **Codex 帳號活動**獨立視窗，提供 Latest / 7D / 30D 的每日**來源回報 Token 活動**，明確區分已回報、零值、缺少資料並顯示涵蓋情況；支援手動重新整理與 Command-R。
+- 額度與帳號活動共用 Codex app-server 連線，強化帳號活動的連線生命週期與重新連線處理。
+- 活動快照僅存在記憶體，不建立永久本機歷史；此功能只保存同意設定，未新增帳號或電子郵件身分追蹤。
+- 來源日期的時區、完整性與保留期間由來源控制，尚未完整公開；Latest 是最近回報的來源日期，不代表「今天」。Token 活動不是帳單或費用資訊，也不同於額度／速率限制視窗。
+- 同一條健康連線仍存活時切換 Codex 帳號，可能暫時看到先前活動快照；**切換帳號後請手動重新整理帳號活動**。
+- 規劃沿用 Apple Development 簽章，非 Developer ID、未公證且無 stapled ticket；首次啟動可能需透過「**系統設定 → 隱私權與安全性 → 仍要打開**」核准。需 macOS 14 以上；Claude Code 仍為 **Experimental / Unverified**。
+
 ## [0.2.0-rc.2] - 2026-09-28
 
 QuotaMew v0.2.0 RC.2 is a focused compatibility release candidate.
