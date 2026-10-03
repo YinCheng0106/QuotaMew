@@ -159,15 +159,15 @@ private struct ActivityTrendView: View {
                 Chart(points) { point in
                     switch point.mark {
                     case .positive:
-                        BarMark(x: .value("Source date", point.sourceDate),
-                                y: .value("Reported tokens", point.reportedTokens!))
+                        BarMark(x: .value(String("Source date"), point.sourceDate),
+                                y: .value(String("Reported tokens"), point.reportedTokens!))
                             .foregroundStyle(Color.accentColor)
                     case .zero:
-                        PointMark(x: .value("Source date", point.sourceDate), y: .value("Reported zero", 0))
+                        PointMark(x: .value(String("Source date"), point.sourceDate), y: .value(String("Reported zero"), 0))
                             .symbol(.circle).symbolSize(40).foregroundStyle(Color.primary)
                     case .missing:
                         // The marker locates a missing date, not a numerical zero bucket.
-                        PointMark(x: .value("Source date", point.sourceDate), y: .value("Not reported", 0))
+                        PointMark(x: .value(String("Source date"), point.sourceDate), y: .value(String("Not reported"), 0))
                             .symbol(.cross).symbolSize(40).foregroundStyle(Color.secondary)
                     }
                 }
