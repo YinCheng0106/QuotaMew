@@ -5,6 +5,37 @@
 	};
 	objectVersion = 77;
 	objects = {
+		515550000000000000000100 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ClaudeQuotaBridge/main.swift"; sourceTree = SOURCE_ROOT; };
+		515550000000000000000200 = {isa = PBXBuildFile; fileRef = 515550000000000000000100; };
+		515550000000000000000101 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "QuotaMew/Domain/ProviderID.swift"; sourceTree = SOURCE_ROOT; };
+		515550000000000000000201 = {isa = PBXBuildFile; fileRef = 515550000000000000000101; };
+		515550000000000000000102 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "QuotaMew/Domain/ProviderCapabilities.swift"; sourceTree = SOURCE_ROOT; };
+		515550000000000000000202 = {isa = PBXBuildFile; fileRef = 515550000000000000000102; };
+		515550000000000000000103 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "QuotaMew/Providers/Claude/ClaudeQuotaContract.swift"; sourceTree = SOURCE_ROOT; };
+		515550000000000000000203 = {isa = PBXBuildFile; fileRef = 515550000000000000000103; };
+		515550000000000000000104 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "QuotaMew/Providers/Claude/ClaudeStatusLineInput.swift"; sourceTree = SOURCE_ROOT; };
+		515550000000000000000204 = {isa = PBXBuildFile; fileRef = 515550000000000000000104; };
+		515550000000000000000105 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "QuotaMew/Providers/Claude/ClaudeSnapshotDTO.swift"; sourceTree = SOURCE_ROOT; };
+		515550000000000000000205 = {isa = PBXBuildFile; fileRef = 515550000000000000000105; };
+		515550000000000000000106 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "QuotaMew/Providers/Claude/ClaudeSnapshotReader.swift"; sourceTree = SOURCE_ROOT; };
+		515550000000000000000206 = {isa = PBXBuildFile; fileRef = 515550000000000000000106; };
+		515550000000000000000107 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "QuotaMew/Providers/Claude/ClaudeSnapshotWriter.swift"; sourceTree = SOURCE_ROOT; };
+		515550000000000000000207 = {isa = PBXBuildFile; fileRef = 515550000000000000000107; };
+		515550000000000000000108 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "QuotaMew/Providers/Claude/ClaudePassiveBridge.swift"; sourceTree = SOURCE_ROOT; };
+		515550000000000000000208 = {isa = PBXBuildFile; fileRef = 515550000000000000000108; };
+		515550000000000000000109 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "QuotaMew/Providers/Claude/ClaudeBridgeComposition.swift"; sourceTree = SOURCE_ROOT; };
+		515550000000000000000209 = {isa = PBXBuildFile; fileRef = 515550000000000000000109; };
+		515550000000000000000300 = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; path = ClaudeQuotaBridge; sourceTree = BUILT_PRODUCTS_DIR; };
+		515550000000000000000301 = {isa = PBXBuildFile; fileRef = 515550000000000000000300; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		515550000000000000000302 = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = Contents/Helpers; dstSubfolderSpec = 1; files = (515550000000000000000301, ); name = "Embed Claude Bridge"; runOnlyForDeploymentPostprocessing = 0; };
+		515550000000000000000303 = {isa = PBXContainerItemProxy; containerPortal = 515550000000000000000001; proxyType = 1; remoteGlobalIDString = 515550000000000000000310; remoteInfo = ClaudeQuotaBridge; };
+		515550000000000000000304 = {isa = PBXTargetDependency; target = 515550000000000000000310; targetProxy = 515550000000000000000303; };
+		515550000000000000000305 = {isa = PBXGroup; name = "Claude Bridge Shared Sources"; children = (515550000000000000000100, 515550000000000000000101, 515550000000000000000102, 515550000000000000000103, 515550000000000000000104, 515550000000000000000105, 515550000000000000000106, 515550000000000000000107, 515550000000000000000108, 515550000000000000000109, ); sourceTree = "<group>"; };
+		515550000000000000000306 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (515550000000000000000200, 515550000000000000000201, 515550000000000000000202, 515550000000000000000203, 515550000000000000000204, 515550000000000000000205, 515550000000000000000206, 515550000000000000000207, 515550000000000000000208, 515550000000000000000209, ); runOnlyForDeploymentPostprocessing = 0; };
+		515550000000000000000310 = {isa = PBXNativeTarget; buildConfigurationList = 515550000000000000000311; buildPhases = (515550000000000000000306, ); buildRules = (); dependencies = (); name = ClaudeQuotaBridge; productName = ClaudeQuotaBridge; productReference = 515550000000000000000300; productType = "com.apple.product-type.tool"; };
+		515550000000000000000311 = {isa = XCConfigurationList; buildConfigurations = (515550000000000000000312, 515550000000000000000313, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		515550000000000000000312 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; CODE_SIGN_IDENTITY = "Apple Development"; DEVELOPMENT_TEAM = 7J5DD7D6Q4; PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = dev.quotapulse.claude-bridge; SKIP_INSTALL = YES; SWIFT_VERSION = 6.0; SWIFT_STRICT_CONCURRENCY = complete; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) CLAUDE_BRIDGE"; }; name = Debug; };
+		515550000000000000000313 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; CODE_SIGN_IDENTITY = "Apple Development"; DEVELOPMENT_TEAM = 7J5DD7D6Q4; PRODUCT_NAME = "$(TARGET_NAME)"; PRODUCT_BUNDLE_IDENTIFIER = dev.quotapulse.claude-bridge; SKIP_INSTALL = YES; SWIFT_VERSION = 6.0; SWIFT_STRICT_CONCURRENCY = complete; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) CLAUDE_BRIDGE"; }; name = Release; };
 
 /* Begin PBXContainerItemProxy section */
 		515550000000000000000020 /* PBXContainerItemProxy */ = {
@@ -57,6 +88,7 @@
 			children = (
 				515550000000000000000040 /* QuotaMew */,
 				515550000000000000000041 /* QuotaMewTests */,
+				515550000000000000000305 /* Claude Bridge Shared Sources */,
 				515550000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -66,6 +98,7 @@
 			children = (
 				515550000000000000000030 /* QuotaMew.app */,
 				515550000000000000000031 /* QuotaMewTests.xctest */,
+				515550000000000000000300 /* ClaudeQuotaBridge */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -80,10 +113,12 @@
 				515550000000000000000060 /* Sources */,
 				515550000000000000000050 /* Frameworks */,
 				515550000000000000000062 /* Resources */,
+				515550000000000000000302 /* Embed Claude Bridge */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				515550000000000000000304 /* ClaudeQuotaBridge */,
 			);
 			fileSystemSynchronizedGroups = (
 				515550000000000000000040 /* QuotaMew */,
@@ -154,6 +189,7 @@
 			targets = (
 				515550000000000000000010 /* QuotaMew */,
 				515550000000000000000011 /* QuotaMewTests */,
+				515550000000000000000310 /* ClaudeQuotaBridge */,
 			);
 		};
 /* End PBXProject section */

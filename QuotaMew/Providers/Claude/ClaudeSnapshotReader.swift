@@ -14,6 +14,7 @@ enum ClaudeSnapshotReaderError: Error, Equatable, Sendable {
     case unsupportedSchema(version: Int)
 }
 
+#if !CLAUDE_BRIDGE
 extension ClaudeSnapshotReaderError: ProviderStatusProvidingError {
     var providerStatus: ProviderStatus {
         switch self {
@@ -34,6 +35,7 @@ extension ClaudeSnapshotReaderError: ProviderStatusProvidingError {
         }
     }
 }
+#endif
 
 protocol ClaudeSnapshotOpening: Sendable {
     func openSnapshot(at url: URL) throws -> FileHandle
@@ -83,6 +85,11 @@ private struct ClaudeSnapshotEnvelope: Decodable {
     let schemaVersion: Int
 }
 
+struct ClaudeSnapshotObservation: Equatable, Sendable {
+    let document: ClaudeUsageSnapshotDocument
+    let generation: ClaudeSnapshotGeneration
+}
+
 struct ClaudeSnapshotReader: ClaudeUsageSnapshotReading, Sendable {
     static let supportedSchemaVersion = 1
 
@@ -101,6 +108,10 @@ struct ClaudeSnapshotReader: ClaudeUsageSnapshotReading, Sendable {
     }
 
     func readSnapshot() async throws -> ClaudeUsageSnapshotDocument {
+        try await readObservation().document
+    }
+
+    func readObservation() async throws -> ClaudeSnapshotObservation {
         try Task.checkCancellation()
 
         let handle: FileHandle
@@ -166,11 +177,12 @@ struct ClaudeSnapshotReader: ClaudeUsageSnapshotReading, Sendable {
         // Validate before emitting a DTO; canonical version output cannot retain arbitrary text.
         // Use observed time here only for validation, never to renew freshness on a read.
         do {
-            return try ClaudeQuotaValidation.sample(
+            let document = try ClaudeQuotaValidation.sample(
                 fiveHour: document.rateLimits.fiveHour, sevenDay: document.rateLimits.sevenDay,
                 observedAt: document.capturedAt, version: document.claudeCodeVersion,
                 now: document.capturedAt
             ).snapshotDocument()
+            return .init(document: document, generation: .init(after))
         } catch let error as ClaudeContractError {
             throw error
         } catch {
@@ -178,7 +190,7 @@ struct ClaudeSnapshotReader: ClaudeUsageSnapshotReading, Sendable {
         }
     }
 
-    private static func defaultSnapshotURL() -> URL {
+    static func defaultSnapshotURL() -> URL {
         FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask

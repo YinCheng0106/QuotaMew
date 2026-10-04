@@ -5,6 +5,7 @@ enum ClaudeContractError: Error, Equatable, Sendable {
     case unverifiedVersion, unsupportedVersion
 }
 
+#if !CLAUDE_BRIDGE
 extension ClaudeContractError: ProviderStatusProvidingError {
     var providerStatus: ProviderStatus { .failed(.refreshFailed) }
 
@@ -16,6 +17,7 @@ extension ClaudeContractError: ProviderStatusProvidingError {
         }
     }
 }
+#endif
 
 struct ClaudeCodeVersion: Equatable, Comparable, Sendable {
     let major: Int
