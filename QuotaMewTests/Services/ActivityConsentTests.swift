@@ -39,7 +39,12 @@ final class ActivityConsentTests: XCTestCase {
         let store = ActivitySnapshotStore()
         let source = ImmediateActivitySource(snapshot: try activitySnapshot())
         let service = ActivityService(sources: [source], store: store, settings: settings)
-        _ = try await service.refresh(provider: .codex)
+        let result = try await service.refresh(provider: .codex)
+        if case .snapshot(let snapshot) = result {
+            for period in ActivityInsightPeriod.allCases {
+                _ = ActivityInsights.query(snapshot, period: period)
+            }
+        } else { XCTFail("Expected synthetic snapshot") }
         XCTAssertEqual(before, defaults.persistentDomain(forName: name)! as NSDictionary)
         await service.shutdown()
     }

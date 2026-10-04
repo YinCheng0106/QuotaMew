@@ -118,6 +118,7 @@ struct ActivityPresentation {
     let sourceText: String
     let summaryAccessibilityText: String
     let points: [ActivityPointPresentation]
+    let insights: ActivityInsightsPresentation?
 
     init(projection: ActivityProjection, period: ActivityPeriod, locale: Locale) {
         self.period = period
@@ -130,6 +131,7 @@ struct ActivityPresentation {
             coverageText = nil
             missingText = nil
             points = []
+            insights = nil
         case .sevenDays, .thirtyDays:
             let window = period == .sevenDays ? projection.sevenDays : projection.thirtyDays
             metricLabel = AppLocalization.string("Reported total", locale: locale)
@@ -138,6 +140,8 @@ struct ActivityPresentation {
             coverageText = ActivityFormatting.coverage(window.coverage, locale: locale)
             missingText = window.coverage.isComplete ? nil : ActivityFormatting.missing(window.coverage.missingDays, locale: locale)
             points = window.points.map { ActivityPointPresentation($0, locale: locale) }
+            insights = ActivityInsightsPresentation(query: period == .sevenDays
+                ? projection.sevenDayInsights : projection.thirtyDayInsights, locale: locale)
         }
         metricText = ActivityFormatting.compact(value, locale: locale)
         metricAccessibilityValue = ActivityFormatting.full(value, locale: locale)

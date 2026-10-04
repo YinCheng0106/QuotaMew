@@ -22,6 +22,8 @@ final class CodexTokenActivitySourceTests: XCTestCase {
         XCTAssertEqual(snapshot.buckets.map(\.reportedTokens), [0, 42])
         assertPrivateDataAbsent(result)
         assertPrivateDataAbsent(snapshot.buckets)
+        assertPrivateDataAbsent(ActivityInsights.query(snapshot, period: .sevenDays))
+        assertPrivateDataAbsent(ActivityInsights.query(snapshot, period: .thirtyDays))
         assertPrivateDataAbsent(try JSONDecoder().decode(CodexAccountUsageTransportResult.self, from: Data(json.utf8)))
         XCTAssertEqual(snapshot.source.scope, .accountAggregate)
         XCTAssertEqual(snapshot.source.basis, .providerReportedTotal)

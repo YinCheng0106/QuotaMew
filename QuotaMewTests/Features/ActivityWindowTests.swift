@@ -330,6 +330,29 @@ final class ActivityWindowTests: XCTestCase {
         XCTAssertEqual(reads, 2)
         await f.cleanUp()
     }
+
+    func testInsightsShareOneRefreshAndClearWithModelLifecycle() async throws {
+        let f = try M4ActivityFixture(enabled: true)
+        try await f.model.refresh()
+        guard case .available(let projection) = f.model.state else { return XCTFail("Expected available") }
+        let persisted = f.defaults.persistentDomain(forName: f.name)! as NSDictionary
+        for _ in 0..<10 {
+            for period in ActivityPeriod.allCases {
+                let report = ActivityPresentation(projection: projection, period: period, locale: Locale(identifier: "en"))
+                XCTAssertEqual(report.insights == nil, period == .latest)
+            }
+        }
+        let reads = await f.source.readCount
+        XCTAssertEqual(reads, 1)
+        XCTAssertEqual(persisted, f.defaults.persistentDomain(forName: f.name)! as NSDictionary)
+        await f.model.transportDidInvalidate()
+        XCTAssertEqual(f.model.state, .idle)
+        let cleared = await f.store.snapshot(for: .codex)
+        XCTAssertNil(cleared)
+        let after = await f.source.readCount
+        XCTAssertEqual(after, 1)
+        await f.cleanUp()
+    }
 }
 
 @MainActor

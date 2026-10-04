@@ -131,6 +131,23 @@ final class ActivityInsightsTests: XCTestCase {
         XCTAssertEqual(result.comparison, .overflow)
     }
 
+    func testCompleteCurrentOverflowSuppressesComparisonAndKeepsIndependentPeak() throws {
+        let result = try insights((0..<14).map { ($0, $0 == 0 ? .max : $0 == 1 ? 1 : 0) })
+        XCTAssertTrue(result.current.coverage.isComplete)
+        XCTAssertTrue(result.previous!.coverage.isComplete)
+        XCTAssertEqual(result.current.dailyReportedAverage, .overflow)
+        XCTAssertEqual(result.comparison, .overflow)
+        guard case .available(let peak) = result.current.highestReportedDay else { return XCTFail() }
+        XCTAssertEqual(peak.bucket.reportedTokens, .max)
+    }
+
+    func testFullWidthPercentageCanFitDespiteIntermediateMultiplyExceedingInt64() throws {
+        let exact = try change(insights((0..<14).map { ($0, $0 == 0 ? .max : $0 == 7 ? 100 : 0) }).comparison)
+        XCTAssertEqual(exact.percentage, .roundedWholePercent(Int64.max - 100))
+        let beyondInt64 = try change(insights((0..<14).map { ($0, $0 == 0 ? .max : $0 == 7 ? 99 : 0) }).comparison)
+        XCTAssertEqual(beyondInt64.percentage, .overflow)
+    }
+
     func testDeltaExtremesAndPercentageOverflowAreTyped() throws {
         let increase = try change(insights((0..<14).map { ($0, $0 == 0 ? .max : $0 == 7 ? 1 : 0) }).comparison)
         XCTAssertEqual(increase.delta, Int64.max - 1)
