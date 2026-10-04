@@ -1,5 +1,7 @@
 # Claude Code 用量資料探索
 
+> 歷史研究紀錄（2026-08-26）。目前契約與實作決策以 [2026-10-05 Claude Provider Foundation](../CLAUDE_PROVIDER_FOUNDATION.md) 為準。本機另有 native `2.1.246`，舊版唯一安裝的推論已過時；目前 auth probe 回報未登入，仍無 live quota 證明。下文「invalid percentage 不產生 window」比實際程式保證更強：finite 超範圍值目前會保留並被 display clamp。最新 status-line 文件也有 idle reset expiry trigger 與 gateway 欄位；不得把 capture time 當成服務 freshness，或直接沿用現有通知／帳號連續性假設。
+
 狀態：2026-08-26 完成本機隱私安全探索、`ClaudeProvider` snapshot reader core 與共用應用程式串接。Production `AppDependencies` 已透過 `UsageProvider` 使用此 provider；尚未安裝 status-line bridge，也沒有修改既有 Claude Code 設定。
 
 ## 結論

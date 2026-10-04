@@ -227,6 +227,14 @@ Runtime 持有唯一 `@Observable @MainActor ActivityModel`，只依 service + p
 
 ## 7. Claude Code 資料來源評估
 
+### 2026-10-05 Foundation 研究更新（未實作 live source）
+
+目前決策為 **CLAUDE PROVIDER PARTIALLY IMPLEMENTABLE**；完整證據、來源等級、能力與下一階段 gates 見 [Claude Provider Foundation](docs/CLAUDE_PROVIDER_FOUNDATION.md)。官方 status-line 的 Pro/Max `five_hour`／`seven_day` consumed percentage 與 epoch reset 可作隔離契約基礎，但它是條件式事件輸出，不是任意刷新服務的 API。最新文件另有 gateway spend limit；不得把它、API billing 或本機 session/activity stats 正規化為訂閱額度或個人 Account Activity。
+
+本機同時有啟動失敗的 npm `1.0.43` 與可執行的 native `2.1.246`；後者的唯讀 `auth status --json` 回報未登入，QuotaMew-owned snapshot 不存在。bridge 與真實訂閱 delivery 仍未驗證。下方舊來源策略繼續保留；本次研究更新優先於舊本機版本與 freshness 假設。
+
+`capturedAt` 只能代表本機收到樣本的時間，不能證明上游服務剛提供新值，也不建立帳號連續性。現有 reader 的有限百分比／timestamp 檢查、generic stale cache 與 provider+window notification identity 不足以直接啟用 Claude 通知。後續先做嚴格 0...100 parser、已過期 window 處理、來源失效清值，以及 support／availability／consent 分離的 capability 設計；只有通過被動 source delivery 與獨立 freshness/lifecycle gate 才可接入 live bridge 或通知。Claude 的個人 Account Activity、Activity Insights 與 Reserve 維持 unsupported；本輪沒有新增 Swift 型別、source 或 runtime 行為。
+
 ### 優先方案：有文件的 status-line JSON 與 opt-in bridge
 
 [Claude Code 官方 status-line 文件](https://code.claude.com/docs/en/statusline) 定義：
@@ -253,7 +261,7 @@ Milestone 3 必須設計明確的設定與復原流程。QuotaMew 不得靜默�
 
 目前已實作的 `ClaudeProvider` 只讀 legacy QuotaPulse-owned、`schemaVersion: 1` 的 `usage-v1.json`。`ClaudeSnapshotReader` 將輸入限制為 16 KiB，拒絕 missing、unreadable、oversized、malformed 與 future-schema files，並保留 `capturedAt` 供後續 stale policy 使用。它不讀取 `~/.claude`、`~/.claude.json`、transcripts、history、stats 或 credentials。完整本機探索與條件式可靠性說明見 `docs/providers/claude-code.md`。
 
-本機 Claude Code package metadata 顯示版本 `1.0.43`，早於官方 changelog 加入 status-line `rate_limits` 的 `2.1.80`；因此沒有宣稱完成本機 live quota 驗證。本機也已有 status-line command，本次沒有讀取其值或修改設定。
+早期探索只確認 npm package `1.0.43`；2026-10-05 重新檢查另找到 native `2.1.246`，但其唯讀 auth 狀態未登入，因此仍沒有本機 live quota 驗證。user settings 已有 status-line command，研究未讀取其值或修改設定。版本至少具有欄位只是必要條件，不能取代實際 delivery／freshness 驗證。
 
 ### 拒絕的 Claude 來源
 
