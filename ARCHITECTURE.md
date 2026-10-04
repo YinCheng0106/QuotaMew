@@ -233,7 +233,19 @@ Runtime 持有唯一 `@Observable @MainActor ActivityModel`，只依 service + p
 
 本機同時有啟動失敗的 npm `1.0.43` 與可執行的 native `2.1.246`；後者的唯讀 `auth status --json` 回報未登入，QuotaMew-owned snapshot 不存在。bridge 與真實訂閱 delivery 仍未驗證。下方舊來源策略繼續保留；本次研究更新優先於舊本機版本與 freshness 假設。
 
-`capturedAt` 只能代表本機收到樣本的時間，不能證明上游服務剛提供新值，也不建立帳號連續性。現有 reader 的有限百分比／timestamp 檢查、generic stale cache 與 provider+window notification identity 不足以直接啟用 Claude 通知。後續先做嚴格 0...100 parser、已過期 window 處理、來源失效清值，以及 support／availability／consent 分離的 capability 設計；只有通過被動 source delivery 與獨立 freshness/lifecycle gate 才可接入 live bridge 或通知。Claude 的個人 Account Activity、Activity Insights 與 Reserve 維持 unsupported；本輪沒有新增 Swift 型別、source 或 runtime 行為。
+### M0／M1 non-live foundation（2026-10-05）
+
+M0／M1 已實作；M2 尚未開始，Claude 仍為 **Experimental / Unverified**。`ProviderCapabilities` 是 UI-independent 的 domain policy：`ProviderCapabilitySupport`（supported／conditional／unsupported／unverified）、`ProviderRuntimeAvailability`（available／unknown／typed unavailable reason）、`ProviderCapabilityEnablement`（provider 與 feature consent）各自獨立，只有合併評估才形成可用資格。Codex 既有 quota、reset display／notifications、Account Activity、Activity Insights 與 Reserve 支援保持不變；broad auth diagnostic 為 unverified，不新增 Codex auth 推論。Claude quota、reset display 與 broad auth 為 conditional，其餘為 unsupported，通知直到 M5 才能重新評估。
+
+純值依賴方向為 `ClaudeStatusLineInput` snake_case allowlist → `ClaudeQuotaValidation` → `ClaudeValidatedQuotaSample` → 自有 `ClaudeUsageSnapshotDocument`／既有 `UsageProvider` normalization。官方原始輸入與 camelCase `usage-v1.json` 不是相同 schema。只模型化 five_hour／seven_day；unknown、gateway spend、cost、model、workspace、prompt、transcript、credentials 等不進 normalized output，decode errors 收斂為固定 enum，無 raw payload/error logging。
+
+保留自有 schemaVersion 1，但嚴格驗證有限 0...100 百分比；越界不 clamp、不轉 available。Reset 為 epoch seconds，產品保守接受 2000-01-01...2100-01-01；missing 可保留百分比，invalid／milliseconds-shaped 值拒絕整份樣本。過去 reset 保留原值並分型為 expired，任一已回報視窗到期或觀察年齡超過 15 分鐘時，整份 normalized sample 為 stale；不補 0、不往前推 reset、不發 completed-reset。未來 observedAt 超過 5 分鐘容差拒絕。
+
+`capturedAt` 明確投影為 `ClaudeSampleProvenance.observedAt`，只代表本機收到樣本；不以讀檔時間或 mtime renew，不提供虛構的 sourceFetchedAt，account continuity 固定 unknown。v1 缺少／畸形版本拒絕 current 使用，低於 2.1.80 為 unsupportedVersion；2.1.80...2.1.242 分型 quotaFieldsOnly，2.1.243...2.1.246 有 idleExpiryFix 基準，較新版本允許 schema validation 而非自動拒絕。版本與 unexpired 樣本均不是上游 freshness 或 live 成功證明。
+
+Claude source 失效／invalid snapshot／停用會清除 AppModel cached sample；Codex 既有 cache policy 保留。`ResetNotificationPolicy`、`LocalResetDetector` 與 `NotificationService` 都以 capability gate 排除 Claude，清除其 baseline／dedup，啟動時取消舊 Claude pending requests。單靠百分比與 reset timestamp 不授予通知資格。Activity runtime 仍只註冊 `CodexTokenActivitySource`；Settings 的 activity consent 另受 capability policy 限制，沒有 Claude Activity／Insights／Reserve fallback。
+
+`ClaudeInstallationLocator` 只有 supplied bounded candidates + injectable probes 的純選擇流程，優先 usable native，再考慮 npm；沒有 production filesystem inventory／CLI probe。`ClaudeAuthDiagnostic` 只有 injectable runner／fixed auth status argv、stdout/stderr bounds、timeout／stdin-close request 契約與 allowlisted loggedIn + exit-code parser。Production process termination／reap／pipe cleanup implementation 留在後續里程碑；本輪 fake tests 不構成 OS process cleanup 或 live auth 證明，quota refresh 不呼叫它。
 
 ### 優先方案：有文件的 status-line JSON 與 opt-in bridge
 
@@ -259,7 +271,7 @@ Claude Code 會在相關 session event 後啟動已設定的 status-line command
 
 Milestone 3 必須設計明確的設定與復原流程。QuotaMew 不得靜默取代既有 `statusLine.command`。可以產生供現有 script 整合的說明，或在顯示完整設定差異並保留可復原備份後，才安裝 wrapper。
 
-目前已實作的 `ClaudeProvider` 只讀 legacy QuotaPulse-owned、`schemaVersion: 1` 的 `usage-v1.json`。`ClaudeSnapshotReader` 將輸入限制為 16 KiB，拒絕 missing、unreadable、oversized、malformed 與 future-schema files，並保留 `capturedAt` 供後續 stale policy 使用。它不讀取 `~/.claude`、`~/.claude.json`、transcripts、history、stats 或 credentials。完整本機探索與條件式可靠性說明見 `docs/providers/claude-code.md`。
+目前已實作的 `ClaudeProvider` 只讀 legacy QuotaPulse-owned、`schemaVersion: 1` 的 `usage-v1.json`。`ClaudeSnapshotReader` 將輸入限制為 16 KiB，先查 schema envelope，再驗證自有 DTO。以 pinned directory descriptors + openat／O_NOFOLLOW 拒絕祖先與 leaf symlink，O_NONBLOCK + regular-file gate 排除 FIFO；檔案須同 effective UID，不能 group／other writable。讀取前後 size／mtime／metadata 變更拒絕，atomic rename 後已開啟的 reader 仍讀原 inode；所有路徑關閉 handle。EACCES／EPERM 獨立為 permissionDenied；missing 為 awaitingSource／notConfigured，未知 I/O 失敗不猜 auth／network state。沿用 capturedAt，不讀取 `~/.claude`、`~/.claude.json`、transcripts、history、stats 或 credentials。Future bridge 的目錄 0700／檔案 0600、writer authenticity 與 generation fencing 尚未實作；v1 reader 不把既有安全的 0644 檔案冒充 bridge installation 證據。完整契約見 [Claude Provider Foundation](docs/CLAUDE_PROVIDER_FOUNDATION.md)。
 
 早期探索只確認 npm package `1.0.43`；2026-10-05 重新檢查另找到 native `2.1.246`，但其唯讀 auth 狀態未登入，因此仍沒有本機 live quota 驗證。user settings 已有 status-line command，研究未讀取其值或修改設定。版本至少具有欄位只是必要條件，不能取代實際 delivery／freshness 驗證。
 

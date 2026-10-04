@@ -21,13 +21,16 @@ struct ClaudeProvider: UsageProvider, Sendable {
 
     private let reader: any ClaudeUsageSnapshotReading
     private let locale: Locale
+    private let now: @Sendable () -> Date
 
     init(
         reader: any ClaudeUsageSnapshotReading = ClaudeSnapshotReader(),
-        locale: Locale = .autoupdatingCurrent
+        locale: Locale = .autoupdatingCurrent,
+        now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.reader = reader
         self.locale = locale
+        self.now = now
     }
 
     func runtimeDiagnostic() async -> ProviderRuntimeDiagnostic {
@@ -53,13 +56,20 @@ struct ClaudeProvider: UsageProvider, Sendable {
             throw ClaudeProviderError.sourceUnavailable
         }
 
+        guard document.schemaVersion == ClaudeSnapshotReader.supportedSchemaVersion else {
+            throw ClaudeSnapshotReaderError.unsupportedSchema(version: document.schemaVersion)
+        }
+        let sample = try ClaudeQuotaValidation.sample(
+            fiveHour: document.rateLimits.fiveHour, sevenDay: document.rateLimits.sevenDay,
+            observedAt: document.capturedAt, version: document.claudeCodeVersion, now: now()
+        )
         var windows: [UsageWindow] = []
 
         if let fiveHour = makeUsageWindow(
             id: "claude.five-hour",
             label: AppLocalization.string("5-hour window", locale: locale),
             duration: .seconds(18_000),
-            source: document.rateLimits.fiveHour
+            source: sample.fiveHour
         ) {
             windows.append(fiveHour)
         }
@@ -68,7 +78,7 @@ struct ClaudeProvider: UsageProvider, Sendable {
             id: "claude.seven-day",
             label: AppLocalization.string("7-day window", locale: locale),
             duration: .seconds(604_800),
-            source: document.rateLimits.sevenDay
+            source: sample.sevenDay
         ) {
             windows.append(sevenDay)
         }
@@ -85,7 +95,8 @@ struct ClaudeProvider: UsageProvider, Sendable {
                 kind: .claudeStatusLineSnapshot,
                 label: "Claude Code status-line snapshot",
                 documentationURL: URL(string: "https://code.claude.com/docs/en/statusline")
-            )
+            ),
+            validity: sample.isStale(at: now()) ? .stale : .unexpired
         )
     }
 
@@ -93,16 +104,12 @@ struct ClaudeProvider: UsageProvider, Sendable {
         id: String,
         label: String,
         duration: Duration,
-        source: ClaudeRateLimitWindow?
+        source: ClaudeValidatedQuotaWindow?
     ) -> UsageWindow? {
         guard let source else { return nil }
 
-        let usedPercentage = source.usedPercentage.flatMap { $0.isFinite ? $0 : nil }
-
-        let resetAt = source.resetsAt.flatMap { timestamp -> Date? in
-            guard timestamp.isFinite, timestamp > 0 else { return nil }
-            return Date(timeIntervalSince1970: timestamp)
-        }
+        let usedPercentage = source.usedPercentage
+        let resetAt = source.reset.date
 
         guard usedPercentage != nil || resetAt != nil else { return nil }
 

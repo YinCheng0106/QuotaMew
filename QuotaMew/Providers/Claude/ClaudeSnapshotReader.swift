@@ -8,6 +8,7 @@ protocol ClaudeUsageSnapshotReading: Sendable {
 enum ClaudeSnapshotReaderError: Error, Equatable, Sendable {
     case snapshotNotFound
     case snapshotUnreadable
+    case permissionDenied
     case snapshotTooLarge
     case invalidSnapshot
     case unsupportedSchema(version: Int)
@@ -18,9 +19,63 @@ extension ClaudeSnapshotReaderError: ProviderStatusProvidingError {
         switch self {
         case .snapshotNotFound:
             .notConfigured
-        case .snapshotUnreadable, .snapshotTooLarge, .invalidSnapshot, .unsupportedSchema:
+        case .snapshotUnreadable, .permissionDenied, .snapshotTooLarge, .invalidSnapshot, .unsupportedSchema:
             .failed(.refreshFailed)
         }
+    }
+
+    var runtimeAvailability: ProviderRuntimeAvailability {
+        switch self {
+        case .snapshotNotFound: .unavailable(.awaitingSource)
+        case .permissionDenied: .unavailable(.permissionDenied)
+        case .snapshotUnreadable: .unavailable(.providerError)
+        case .snapshotTooLarge, .invalidSnapshot: .unavailable(.invalidData)
+        case .unsupportedSchema: .unavailable(.unsupportedSchema)
+        }
+    }
+}
+
+protocol ClaudeSnapshotOpening: Sendable {
+    func openSnapshot(at url: URL) throws -> FileHandle
+}
+
+struct ClaudeSnapshotFileOpener: ClaudeSnapshotOpening {
+    func openSnapshot(at url: URL) throws -> FileHandle {
+        guard url.isFileURL, url.path.utf8.count <= 4_096 else {
+            throw ClaudeSnapshotReaderError.snapshotUnreadable
+        }
+        // Walk pinned directory descriptors. Reject symlinks in every component;
+        // do not resolve an untrusted ancestor and then mistake it for a safe path.
+        let components = url.pathComponents.dropFirst()
+        guard !components.isEmpty, !components.contains("..") else {
+            throw ClaudeSnapshotReaderError.snapshotUnreadable
+        }
+        var directory = open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        guard directory >= 0 else { throw Self.error(for: errno) }
+        defer { Darwin.close(directory) }
+        for component in components.dropLast() {
+            let next = openat(directory, component, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+            guard next >= 0 else { throw Self.error(for: errno) }
+            Darwin.close(directory)
+            directory = next
+        }
+        let descriptor = openat(directory, components.last!, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
+        guard descriptor >= 0 else { throw Self.error(for: errno) }
+        return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+    }
+
+    static func error(for code: Int32) -> ClaudeSnapshotReaderError {
+        switch code {
+        case ENOENT: .snapshotNotFound
+        case EACCES, EPERM: .permissionDenied
+        default: .snapshotUnreadable
+        }
+    }
+
+    static func hasSafeMetadata(_ metadata: stat, effectiveUID: uid_t) -> Bool {
+        metadata.st_mode & S_IFMT == S_IFREG
+            && metadata.st_uid == effectiveUID
+            && metadata.st_mode & (S_IWGRP | S_IWOTH) == 0
     }
 }
 
@@ -33,20 +88,39 @@ struct ClaudeSnapshotReader: ClaudeUsageSnapshotReading, Sendable {
 
     private let fileURL: URL
     private let maximumBytes: Int
+    private let opener: any ClaudeSnapshotOpening
 
     init(
         fileURL: URL = Self.defaultSnapshotURL(),
-        maximumBytes: Int = 16_384
+        maximumBytes: Int = 16_384,
+        opener: any ClaudeSnapshotOpening = ClaudeSnapshotFileOpener()
     ) {
         self.fileURL = fileURL
-        self.maximumBytes = max(maximumBytes, 1)
+        self.maximumBytes = min(max(maximumBytes, 1), 16_384)
+        self.opener = opener
     }
 
     func readSnapshot() async throws -> ClaudeUsageSnapshotDocument {
         try Task.checkCancellation()
 
-        let handle = try openSnapshot()
+        let handle: FileHandle
+        do {
+            handle = try opener.openSnapshot(at: fileURL)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as ClaudeSnapshotReaderError {
+            throw error
+        } catch {
+            throw ClaudeSnapshotReaderError.snapshotUnreadable
+        }
         defer { try? handle.close() }
+
+        var before = stat()
+        guard fstat(handle.fileDescriptor, &before) == 0,
+              ClaudeSnapshotFileOpener.hasSafeMetadata(before, effectiveUID: geteuid()) else {
+            throw ClaudeSnapshotReaderError.snapshotUnreadable
+        }
+        guard before.st_size <= maximumBytes else { throw ClaudeSnapshotReaderError.snapshotTooLarge }
 
         let data: Data
         do {
@@ -59,6 +133,14 @@ struct ClaudeSnapshotReader: ClaudeUsageSnapshotReading, Sendable {
 
         guard data.count <= maximumBytes else {
             throw ClaudeSnapshotReaderError.snapshotTooLarge
+        }
+        var after = stat()
+        guard fstat(handle.fileDescriptor, &after) == 0,
+              before.st_size == after.st_size,
+              before.st_mtimespec.tv_sec == after.st_mtimespec.tv_sec,
+              before.st_mtimespec.tv_nsec == after.st_mtimespec.tv_nsec,
+              ClaudeSnapshotFileOpener.hasSafeMetadata(after, effectiveUID: geteuid()) else {
+            throw ClaudeSnapshotReaderError.invalidSnapshot
         }
 
         let decoder = JSONDecoder()
@@ -75,36 +157,25 @@ struct ClaudeSnapshotReader: ClaudeUsageSnapshotReading, Sendable {
             throw ClaudeSnapshotReaderError.unsupportedSchema(version: envelope.schemaVersion)
         }
 
+        let document: ClaudeUsageSnapshotDocument
         do {
-            return try decoder.decode(ClaudeUsageSnapshotDocument.self, from: data)
+            document = try decoder.decode(ClaudeUsageSnapshotDocument.self, from: data)
         } catch {
             throw ClaudeSnapshotReaderError.invalidSnapshot
         }
-    }
-
-    private func openSnapshot() throws -> FileHandle {
-        let descriptor = open(
-            fileURL.path,
-            O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK
-        )
-
-        guard descriptor >= 0 else {
-            if errno == ENOENT {
-                throw ClaudeSnapshotReaderError.snapshotNotFound
-            }
-            throw ClaudeSnapshotReaderError.snapshotUnreadable
+        // Validate before emitting a DTO; canonical version output cannot retain arbitrary text.
+        // Use observed time here only for validation, never to renew freshness on a read.
+        do {
+            return try ClaudeQuotaValidation.sample(
+                fiveHour: document.rateLimits.fiveHour, sevenDay: document.rateLimits.sevenDay,
+                observedAt: document.capturedAt, version: document.claudeCodeVersion,
+                now: document.capturedAt
+            ).snapshotDocument()
+        } catch let error as ClaudeContractError {
+            throw error
+        } catch {
+            throw ClaudeSnapshotReaderError.invalidSnapshot
         }
-
-        var metadata = stat()
-        guard
-            fstat(descriptor, &metadata) == 0,
-            metadata.st_mode & S_IFMT == S_IFREG
-        else {
-            Darwin.close(descriptor)
-            throw ClaudeSnapshotReaderError.snapshotUnreadable
-        }
-
-        return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
     }
 
     private static func defaultSnapshotURL() -> URL {

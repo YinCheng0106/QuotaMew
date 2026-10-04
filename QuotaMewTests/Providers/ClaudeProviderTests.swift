@@ -20,7 +20,7 @@ final class ClaudeProviderTests: XCTestCase {
                 )
             )
         )
-        let provider = ClaudeProvider(
+        let provider = makeProvider(
             reader: StubClaudeUsageSnapshotReader(result: .success(document)),
             locale: Locale(identifier: "en")
         )
@@ -45,16 +45,16 @@ final class ClaudeProviderTests: XCTestCase {
         let document = ClaudeUsageSnapshotDocument(
             schemaVersion: 1,
             capturedAt: Date(timeIntervalSince1970: 2_000_000_000),
-            claudeCodeVersion: nil,
+            claudeCodeVersion: "2.1.246",
             rateLimits: ClaudeRateLimits(
                 fiveHour: nil,
                 sevenDay: ClaudeRateLimitWindow(
-                    usedPercentage: 140,
+                    usedPercentage: 40,
                     resetsAt: nil
                 )
             )
         )
-        let provider = ClaudeProvider(
+        let provider = makeProvider(
             reader: StubClaudeUsageSnapshotReader(result: .success(document))
         )
 
@@ -62,8 +62,8 @@ final class ClaudeProviderTests: XCTestCase {
 
         XCTAssertEqual(snapshot.windows.count, 1)
         XCTAssertEqual(snapshot.windows[0].id, "claude.seven-day")
-        XCTAssertEqual(snapshot.windows[0].usedPercentage, 140)
-        XCTAssertEqual(snapshot.windows[0].displayUsedPercentage, 100)
+        XCTAssertEqual(snapshot.windows[0].usedPercentage, 40)
+        XCTAssertEqual(snapshot.windows[0].displayUsedPercentage, 40)
         XCTAssertNil(snapshot.windows[0].resetAt)
     }
 
@@ -75,7 +75,7 @@ final class ClaudeProviderTests: XCTestCase {
                 resetsAt: resetTimestamp
             )
         )
-        let provider = ClaudeProvider(
+        let provider = makeProvider(
             reader: StubClaudeUsageSnapshotReader(result: .success(document))
         )
 
@@ -91,7 +91,7 @@ final class ClaudeProviderTests: XCTestCase {
         let document = ClaudeUsageSnapshotDocument(
             schemaVersion: 1,
             capturedAt: Date(timeIntervalSince1970: 2_000_000_000),
-            claudeCodeVersion: nil,
+            claudeCodeVersion: "2.1.246",
             rateLimits: ClaudeRateLimits(
                 fiveHour: ClaudeRateLimitWindow(
                     usedPercentage: nil,
@@ -100,7 +100,7 @@ final class ClaudeProviderTests: XCTestCase {
                 sevenDay: nil
             )
         )
-        let provider = ClaudeProvider(
+        let provider = makeProvider(
             reader: StubClaudeUsageSnapshotReader(result: .success(document))
         )
 
@@ -118,7 +118,7 @@ final class ClaudeProviderTests: XCTestCase {
         let document = ClaudeUsageSnapshotDocument(
             schemaVersion: 1,
             capturedAt: Date(timeIntervalSince1970: 2_000_000_000),
-            claudeCodeVersion: nil,
+            claudeCodeVersion: "2.1.246",
             rateLimits: ClaudeRateLimits(
                 fiveHour: ClaudeRateLimitWindow(
                     usedPercentage: nil,
@@ -127,7 +127,7 @@ final class ClaudeProviderTests: XCTestCase {
                 sevenDay: nil
             )
         )
-        let provider = ClaudeProvider(
+        let provider = makeProvider(
             reader: StubClaudeUsageSnapshotReader(result: .success(document))
         )
 
@@ -140,20 +140,20 @@ final class ClaudeProviderTests: XCTestCase {
     }
 
     func testPreservesOldCaptureTimeWithoutClaimingTheSnapshotIsFresh() async throws {
-        let capturedAt = Date(timeIntervalSince1970: 1_000)
+        let capturedAt = Date(timeIntervalSince1970: 1_000_000_000)
         let document = ClaudeUsageSnapshotDocument(
             schemaVersion: 1,
             capturedAt: capturedAt,
-            claudeCodeVersion: nil,
+            claudeCodeVersion: "2.1.246",
             rateLimits: ClaudeRateLimits(
                 fiveHour: ClaudeRateLimitWindow(
                     usedPercentage: 10,
-                    resetsAt: 2_000
+                    resetsAt: 1_000_001_000
                 ),
                 sevenDay: nil
             )
         )
-        let provider = ClaudeProvider(
+        let provider = makeProvider(
             reader: StubClaudeUsageSnapshotReader(result: .success(document))
         )
 
@@ -161,10 +161,11 @@ final class ClaudeProviderTests: XCTestCase {
 
         XCTAssertEqual(snapshot.capturedAt, capturedAt)
         XCTAssertEqual(snapshot.windows[0].usedPercentage, 10)
+        XCTAssertEqual(snapshot.validity, .stale)
     }
 
     func testMissingSnapshotMapsToNotConfiguredState() async {
-        let provider = ClaudeProvider(
+        let provider = makeProvider(
             reader: StubClaudeUsageSnapshotReader(
                 result: .failure(ClaudeSnapshotReaderError.snapshotNotFound)
             )
@@ -178,7 +179,7 @@ final class ClaudeProviderTests: XCTestCase {
     }
 
     func testMalformedSnapshotMapsToSanitizedErrorState() async {
-        let provider = ClaudeProvider(
+        let provider = makeProvider(
             reader: StubClaudeUsageSnapshotReader(
                 result: .failure(ClaudeSnapshotReaderError.invalidSnapshot)
             )
@@ -195,7 +196,7 @@ final class ClaudeProviderTests: XCTestCase {
     }
 
     func testUnavailableUsageMapsToSanitizedErrorState() async {
-        let provider = ClaudeProvider(
+        let provider = makeProvider(
             reader: StubClaudeUsageSnapshotReader(
                 result: .success(makeDocument(fiveHour: nil))
             )
@@ -212,7 +213,7 @@ final class ClaudeProviderTests: XCTestCase {
     }
 
     func testProviderFailureMapsToSanitizedErrorState() async {
-        let provider = ClaudeProvider(
+        let provider = makeProvider(
             reader: StubClaudeUsageSnapshotReader(
                 result: .failure(TestClaudeReaderError(message: "sensitive provider details"))
             )
@@ -230,7 +231,7 @@ final class ClaudeProviderTests: XCTestCase {
 
     func testKnownInstallationAndAuthenticationStatusesArePreserved() async {
         for status in [ProviderStatus.notInstalled, .unsupportedAuthentication] {
-            let provider = ClaudeProvider(
+            let provider = makeProvider(
                 reader: StubClaudeUsageSnapshotReader(
                     result: .failure(TestClaudeStatusError(providerStatus: status))
                 )
@@ -244,13 +245,43 @@ final class ClaudeProviderTests: XCTestCase {
         }
     }
 
+    private func makeProvider(
+        reader: any ClaudeUsageSnapshotReading, locale: Locale = .autoupdatingCurrent
+    ) -> ClaudeProvider {
+        ClaudeProvider(reader: reader, locale: locale, now: { Date(timeIntervalSince1970: 2_000_000_000) })
+    }
+
+    func testRejectsOutOfRangeInsteadOfClamping() async {
+        for value in [-1.0, 140, .nan, .infinity] {
+            let provider = makeProvider(reader: StubClaudeUsageSnapshotReader(result: .success(
+                makeDocument(fiveHour: .init(usedPercentage: value, resetsAt: 2_000_003_600))
+            )))
+            do {
+                _ = try await provider.fetchUsage()
+                XCTFail("Invalid percentages cannot produce an available window")
+            } catch {
+                XCTAssertEqual(error as? ClaudeContractError, .invalidPercentage)
+            }
+        }
+    }
+
+    func testExpiredResetRemainsLastReportedSampleAndServiceIsStale() async {
+        let provider = makeProvider(reader: StubClaudeUsageSnapshotReader(result: .success(
+            makeDocument(fiveHour: .init(usedPercentage: 73, resetsAt: 1_999_999_999))
+        )))
+        let states = await UsageService(providers: [provider]).refresh()
+        XCTAssertEqual(states.first?.status, .stale)
+        XCTAssertEqual(states.first?.snapshot?.windows.first?.usedPercentage, 73)
+        XCTAssertEqual(states.first?.snapshot?.windows.first?.resetAt, Date(timeIntervalSince1970: 1_999_999_999))
+    }
+
     private func makeDocument(
         fiveHour: ClaudeRateLimitWindow?
     ) -> ClaudeUsageSnapshotDocument {
         ClaudeUsageSnapshotDocument(
             schemaVersion: 1,
             capturedAt: Date(timeIntervalSince1970: 2_000_000_000),
-            claudeCodeVersion: nil,
+            claudeCodeVersion: "2.1.246",
             rateLimits: ClaudeRateLimits(
                 fiveHour: fiveHour,
                 sevenDay: nil

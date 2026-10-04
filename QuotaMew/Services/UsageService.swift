@@ -85,7 +85,7 @@ actor UsageService {
 
             return ProviderState(
                 providerID: provider.id,
-                status: .available,
+                status: snapshot.validity == .stale ? .stale : .available,
                 snapshot: snapshot
             )
         } catch is CancellationError {

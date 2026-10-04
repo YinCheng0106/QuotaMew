@@ -2,6 +2,8 @@
 
 研究日期：2026-10-05（Asia/Taipei）。本文件是截至此日的來源稽核與後續實作決策，不是 live provider 完成證明。
 
+第 1–17 節保留原研究階段證據；同日後續 M0／M1 實作、行為修正與驗證另記於第 18 節。**M0 COMPLETE；M1 COMPLETE；M2 NOT STARTED**。這不提升 Claude 的 Experimental / Unverified 支援狀態。
+
 **實作分類：B — CLAUDE PROVIDER PARTIALLY IMPLEMENTABLE。**
 
 可開始隔離的訂閱 quota 契約、嚴格 parser、能力與失敗狀態設計。官方 status-line 提供條件式額度資料，但本機未登入、bridge 未安裝，尚無真實欄位交付、服務 freshness 或帳號連續性驗證。不得直接啟用 live retrieval 或重設通知。Claude 的個人訂閱 Account Activity／Activity Insights 沒有找到符合本產品邊界的來源。
@@ -375,9 +377,9 @@ Fixtures 全部手寫 synthetic，有清楚 scope/provenance 標註；不從真�
 
 | Milestone | 有界交付與進入條件 | 完成證據 |
 | --- | --- | --- |
-| **M0 — contracts/capabilities** | 訂閱額度、本機活動與 API billing 分型；support 與 runtime availability 分開；來源 freshness／account unknown 明確表達 | synthetic capability/failure/privacy tests；無 live I/O。**推薦下一輪範圍** |
-| **M1 — projection/parser hardening** | 官方 snake_case allowlist 投影、嚴格 0…100／reset／version／expired window；糾正現有 clamp 測試及 v1 schema 假設 | deterministic parser/filesystem tests；只有 non-live foundation |
-| **M2 — opt-in source bridge** | M0/M1 完成，正常訂閱 session 被動 delivery 可驗證；先提供人工 composition，不自動修改 settings | minimal schema delivery、atomic write／owner/mode／bounded stdin、原 status line 輸出與可復原整合證據；先 Experimental |
+| **M0 — contracts/capabilities** | 訂閱額度、本機活動與 API billing 分型；support 與 runtime availability 分開；來源 freshness／account unknown 明確表達 | **COMPLETE**：第 18 節；synthetic capability/failure/privacy tests，無 live I/O |
+| **M1 — projection/parser hardening** | 官方 snake_case allowlist 投影、嚴格 0…100／reset／version／expired window；糾正現有 clamp 測試及 v1 schema 假設 | **COMPLETE**：第 18 節；deterministic parser/filesystem tests，只有 non-live foundation |
+| **M2 — opt-in source bridge** | M0/M1 完成，正常訂閱 session 被動 delivery 可驗證；先提供人工 composition，不自動修改 settings | **NOT STARTED**：minimal schema delivery、atomic write／owner/mode／bounded stdin、原 status line 輸出與可復原整合證據；先 Experimental |
 | **M3 — provider/lifecycle** | 對 source age／failed/expired/unknown continuity 有明確產品 policy | 源失效 clear、coalescing／cancel／late completion、re-baseline；無 persistent Claude process |
 | **M4 — capability UI** | M3 允許顯示的 snapshot 及局限已成立 | setup/version/auth/source/expired 區別；pin 與 5H/W 正確；activity/reserve 不開；獨立 manual UI 驗收 |
 | **M5 — notifications** | **blocked**，須可信 source freshness 與足夠 continuity／安全 policy 實證；只有 epoch 不夠 | fake center 測試 + 正常使用中的有界 live acceptance；completed reset 另設更高 gate |
@@ -418,3 +420,95 @@ Fixtures 全部手寫 synthetic，有清楚 scope/provenance 標註；不從真�
 - 文件檢查：`git diff --check`；另外確認變更檔案清單、App/test version 欄位與 beta ref 維持 baseline。沒有 source/test code，因此不跑 XCTest／Debug build／release validation。
 - 建立單一 focused local documentation commit，不 push。實際 commit SHA 與最後 git state 由本輪最終報告回填到聊天；不把文件內自我引用當 commit 證據。
 - 下一步：只執行 M0／M1 non-live contract 與 parser 工作；真實 source 需 M2 被動 delivery gate，通知需 M5 額外 gate。個人 Account Activity／Insights／Reserve 維持 unsupported。
+
+## 18. M0／M1 實作紀錄（2026-10-05）
+
+### 18.1 Preflight 與窄幅修正
+
+- Branch：`feat/claude-provider-foundation`；起始 `e8e01526551a8e58d9c8c88039dd62cb57066ae1`，工作樹乾淨，包含 `docs(claude): establish provider foundation contract`。
+- `git fetch origin` 後 `origin/main`／merge-base 都是 `924df240b0311bb82c261692beae18204d8b94f7`（Activity Insights merge）；沒有意外前進、不 rebase、不 push。
+- 編輯前重新稽核 ClaudeProvider、reader、自有 DTO、ProviderID／UsageWindow／ProviderStatus、AppDependencies、SettingsStore、UsageService／AppModel 與三個通知層。確認有限但越界百分比會經 shared display clamp；reset 只有 finite/positive gate；未驗證版本；capture-age stale 不涵蓋 fresh capture + expired reset；reader 未拒絕祖先 symlink／file owner/mode；notification lifecycle 未阻擋 manual Claude samples。
+- 窄幅修改限純契約／projection、reader、Claude provider normalization、shared snapshot 的預設不改 Codex 的 validity metadata、必要的 cache／notification gates，以及 synthetic tests。沒有 Settings／Dashboard redesign。
+
+### 18.2 能力與 runtime／consent
+
+`ProviderCapabilities` 為純 domain API，集中 provider policy。支援、runtime evidence 與 consent 不是同一個 Bool：
+
+| 型別 | 含義 |
+| --- | --- |
+| ProviderCapabilitySupport | supported／conditional／unsupported／unverified；產品契約能否支持 |
+| ProviderRuntimeAvailability | available／unknown／unavailable(reason)；當前證據，不能由支援或開關推導 |
+| ProviderCapabilityEnablement | providerEnabled 與 featureEnabled；沿用現有 settings consent，不加新持久化 |
+| ProviderCapabilityAssessment | 只有 supported/conditional + runtime available + 兩個 enablement 全成立才 isUsable |
+
+| Dimension | Codex | Claude |
+| --- | --- | --- |
+| quota | supported，保留既有行為 | conditional |
+| resetTimeDisplay | supported | conditional |
+| resetNotifications | supported | unsupported；M5 hard gate |
+| accountActivity | supported | unsupported |
+| activityInsights | supported | unsupported |
+| reserveBucket | supported；既有 informational policy 不變 | unsupported |
+| broadAuthDiagnostic | unverified；不新增 Codex auth semantics | conditional；只提供 non-live abstraction |
+
+最小 unavailable reasons 為 notInstalled、notAuthenticated、awaitingSource、unsupportedVersion、unsupportedSchema、invalidData、permissionDenied、providerError、stale、continuityUnknown。沒有 live request evidence，因此不增設 speculative network／temporarilyUnavailable／contractChanged 判斷。既有 ProviderStatus/UI 文案仍沿用 sanitized generic failure；新契約提供 typed reason 供未來 UI query。
+
+### 18.3 官方輸入 → validated contract → 自有 v1 snapshot
+
+`ClaudeStatusLineParser` 的 private `ClaudeStatusLineInput` 只解碼 `rate_limits` → `five_hour`／`seven_day` → `used_percentage`／`resets_at`。16 KiB 上限，missing/null 的兩視窗獨立保留，unknown/private fields 不模型化、不保存 raw input。缺少 rate_limits 表示沒有回報，不推論 unsupportedContract／auth／network。
+
+`ClaudeQuotaValidation` 產出 `ClaudeValidatedQuotaSample`／`ClaudeValidatedQuotaWindow`，再由 `snapshotDocument()` 明確投影為 QuotaMew-owned camelCase `ClaudeUsageSnapshotDocument`。沒有 filesystem writer。Subscription quota 與 local activity／Anthropic API billing 不共用欄位；gateway spend、paid credits、overage 不投影為 Reserve。
+
+**選擇 A：安全硬化 schemaVersion 1**。`capturedAt` 原樣轉為 observedAt，已知語意不需新增 upstream timestamp。v1 optional version 仍可 decode，但缺少／畸形版本無法通過 current-use gate；不為 backward compatibility 放寬此條件。Known schema 先驗證 envelope；future schema 在 payload decode 前拒絕，future Claude executable version 則另依資料契約驗證，兩者不同。
+
+- Percentage：finite 且 0...100；0／fraction／100 有效，negative／>100／NaN／Inf／string／bool／其他 type 拒絕。任一已提供 core field 無效即拒絕整份 sample，不悄悄丟欄位或 clamp 後 available。
+- Reset：Unix epoch seconds，產品保守範圍 2000-01-01...2100-01-01；此寬範圍不是方案 reset duration，足以排除當代 milliseconds-shaped 值／overflow／不可用 Date。Missing reset 仍可顯示有效百分比；reset-only 不補 percentage；invalid reset 拒絕。
+- `ClaudeResetObservation` 區分 missing、reported(Date)、expired(Date)。過去或恰等於 now 的 reset 保留原值；不 set used=0、不 advance、不宣稱新 cycle。
+- 同一 sample 若任一已回報視窗 reset 到期，或 observedAt 年齡 >15 分鐘，normalized `UsageSampleValidity.stale` → UsageService `.stale`。整份 conservative stale gate 保留各視窗資料，避免把其中一個 expired window 包裝成 available；未來 M4 可另規劃每視窗 presentation。
+- `ClaudeSampleProvenance` 只有實際本機 observedAt；沒有 sourceFetchedAt／mtime freshness。未來觀察時間 >5 分鐘 skew 拒絕，重讀同檔不 renew。unexpired 只表示本機樣本通過 age/expiry gates，**不證明上游服務 fresh**。
+- Version：missing／malformed → unverifiedVersion；<2.1.80 → unsupportedVersion；2.1.80...2.1.242 → quotaFieldsOnly；2.1.243...2.1.246 → idleExpiryFix；較新 → future 並允許同樣 schema validation。Strict numeric semver、bounded length、canonical output；必要 gate 不等於 runtime success。
+
+### 18.4 Failure、diagnostic 與 privacy
+
+Reader missing → snapshotNotFound／awaitingSource／既有 notConfigured；EACCES/EPERM → permissionDenied；unsupported own schema → unsupportedSchema；wrong type／malformed bytes → invalidSnapshot；numeric/reset/observation invalid → typed ClaudeContractError；未知 I/O／runner failure → 固定 providerError，不洩漏 path／stderr／NSError body。
+
+`ClaudeAuthDiagnosticRunning`／`ClaudeAuthDiagnosticRequest` 定義固定 executable candidate + `["auth", "status", "--json"]`、stdout 16 KiB、stderr 4 KiB、10s timeout、closed stdin。`ClaudeAuthDiagnostic` 注入 runner 並遮罩未知錯誤、保留 typed timeout／cancellation；`ClaudeAuthStatusParser` 只 decode loggedIn Bool，loggedIn=true + exit 0／false + exit 1 才形成 broad auth state。任意 nonzero／錯誤 JSON 不等於未登入；authenticated 不等於 subscription quota available。
+
+**沒有 production auth runner**。OS timeout enforcement／terminate/reap／pipe cleanup 是未來 runner 的明文契約，不以 fake tests 冒充 process implementation。本輪沒有執行 Claude CLI，也不在 quota refresh 呼叫 auth。
+
+`ClaudeInstallationProbing` + `ClaudeInstallationLocator` 只接受外部提供的最多 8 個 executable candidates，順序偏好 usable native，失敗再考慮 npm。所有候選 missing 才 notInstalled；unusable 不當作 notInstalled／notAuthenticated；mixed ambiguous failures 安全 fallback providerError；future version 可通過。沒有 production inventory、arbitrary filesystem scan、login shell 或 PATH mutation。
+
+所有 parser/error paths 只輸出 typed allowlist；synthetic credentials/email/prompt/workspace/transcript/session fields 從 normalized sample/document／diagnostic state／descriptions 中消失。Known field 含 fake secret 而 decode failure、malformed version、unknown runner stderr-like NSError 均不向外傳 raw string；foundation code 無 raw logging。
+
+### 18.5 Filesystem、continuity 與 hard gates
+
+- Reader 用 pinned descriptor openat 走每層目錄、O_NOFOLLOW 拒絕祖先/leaf symlink；O_NONBLOCK + fstat regular file 排除 FIFO；同 effective UID、拒絕 group/other writable。Read 16 KiB+1，讀前後 size/mtime/metadata 不一致拒絕；所有 owned handle defer close，cancellation 保留。
+- Atomic rename race 測試讀取已 pinned 舊 inode，下一次讀新 inode，沒有混合／freshness renew。Partial/malformed snapshot 拒絕。Owner mismatch 用 synthetic stat 測試，不需 chown；EACCES/EPERM 用 injectable fake opener + errno classifier，不假裝真實 OS 權限故障已實測。
+- 現有 v1 允許同 UID 且非 group/other writable 的 0644；M2 bridge writer 應實作 owner-only 0700 directories／0600 file、atomic writes。此 reader 不宣稱防範同 UID malicious writer／完整 writer authenticity，亦不為既有 file chmod。
+- Account continuity 固定 unknown；沒有 account ID、email/token hash、credential access。Claude disable／invalid/source failure 清 AppModel cached sample；Codex cache 行為不變。M3 完整 source-generation/account lifecycle 尚未開始。
+- `ResetNotificationPolicy` + `LocalResetDetector` capability gate 排除 Claude，清其 baseline/dedup；`NotificationService` 排除 eligibility 並取消舊 Claude pending requests。有效百分比+future reset、甚至人工 new-cycle-like transition，都不能取得通知資格。
+- Runtime Activity 仍只有 CodexTokenActivitySource；Settings consent 查 capability；Claude Account Activity／Insights unsupported、無 stats-cache fallback。Reserve unsupported，沒模型化 gateway/credits/spend。
+
+### 18.6 驗證與交付
+
+新增 ProviderCapabilitiesTests、ClaudeQuotaContractTests、ClaudeDiagnosticContractTests；擴充 ClaudeProviderTests／ClaudeSnapshotReaderTests、AppModelTests、NotificationServiceTests／LocalResetDetectorTests。移除既有 Claude 140→100 available expectation，將人工 Claude 通知／跨 snapshot reset entitlement expectations 改為拒絕；Codex DTO mapping 與 shared defensive presentation clamp 不改，避免新增 Codex semantics。
+
+| 驗證 | 實際結果 |
+| --- | --- |
+| Targeted XCTest | 最後一輪 131 tests：130 passed、0 failed、1 expected live-notification opt-in skip |
+| Full deterministic XCTest | 518 tests：511 passed、0 failed、7 expected opt-in skips；xcresult summary 驗證非零 executed count |
+| Full skips | ActivityServiceLive、ActivityModelLive、CodexTokenActivitySource live、NotificationService live delivery、CodexProvider live、ActivityWindowLive、bounded synthetic reconnect resource opt-in |
+| Runtime warnings | Full xcresult 有 2 筆 user-initiated 等待 utility QoS priority-inversion warnings；未視為功能失敗或無警告證明，未擴大修改 Codex transport／效能範圍 |
+| Clean Debug build | 獨立 derived data、clean build、exit 0；quiet build log 無 warning/error |
+| Clean Release build | 獨立 derived data、clean build、exit 0；quiet build log 無 warning/error；非簽章／公證／distribution／resource profile 證明 |
+| git diff --check | passed |
+| Localization | 無 String Catalog／localization 變更，不新增 user-facing 文案 |
+| Documentation | 本文件 + ARCHITECTURE.md；public README status／ROADMAP 不改 |
+| Metadata／beta | App 0.3.0 / build 6、test target 0.1.1 / build 1 保持不變；v0.3.0-beta.1 commit 仍 87485c2e1ac65c90718a091cb2e521d8443519b3 |
+| Live boundaries | 無 Claude quota CLI/network、bridge install/write、settings mutation、credential/transcript read、登入／登出／prompt；沒有改 website／beta release files |
+
+第一輪 targeted 的 9 個 reader failures 來自 Foundation 暫存 URL 導向 `/var` symlink；fixture 改為明確 `/private/tmp`，保留 production 祖先 symlink gate，後續重跑通過。最後結果來自 `/tmp/quotamew-claude-m01-targeted-final.xcresult` 與 `/tmp/quotamew-claude-m01-full.xcresult`；這些為本機暫存驗證產物，不含 live Claude payload，不 commit。
+
+Local commits 分為能力/安全 policy 與 quota/parser/reader foundation 兩個 coherent units；不 push。實際 SHAs 與 final clean status 記於聊天交付，避免文件自我引用 commit。**CLAUDE M0/M1 COMPLETE — READY FOR PASSIVE BRIDGE DESIGN**。
+
+M2 建議只開始 passive bridge design：人工 previewable/reversible composition、bounded stdin allowlist、owner-only atomic writer、觀察時間與上游 freshness 限制、source generation fencing；先驗證正常符合資格的訂閱 session 被動交付，再評估 M3／M4。通知仍須獨立 M5 證據，個人 Activity／Insights／Reserve 維持 unsupported。
