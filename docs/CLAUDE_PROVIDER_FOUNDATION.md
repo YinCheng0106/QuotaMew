@@ -379,7 +379,8 @@ Fixtures 全部手寫 synthetic，有清楚 scope/provenance 標註；不從真�
 | --- | --- | --- |
 | **M0 — contracts/capabilities** | 訂閱額度、本機活動與 API billing 分型；support 與 runtime availability 分開；來源 freshness／account unknown 明確表達 | **COMPLETE**：第 18 節；synthetic capability/failure/privacy tests，無 live I/O |
 | **M1 — projection/parser hardening** | 官方 snake_case allowlist 投影、嚴格 0…100／reset／version／expired window；糾正現有 clamp 測試及 v1 schema 假設 | **COMPLETE**：第 18 節；deterministic parser/filesystem tests，只有 non-live foundation |
-| **M2 — opt-in source bridge** | M0/M1 完成，正常訂閱 session 被動 delivery 可驗證；先提供人工 composition，不自動修改 settings | **NOT STARTED**：minimal schema delivery、atomic write／owner/mode／bounded stdin、原 status line 輸出與可復原整合證據；先 Experimental |
+| **M2A — passive bridge core** | M0/M1 完成；只用 synthetic event 驗證 bounded stdin、minimal delivery、composition 與 rollback | **COMPLETE**：第 19 節；不修改 Claude 設定、不安裝或 live activation |
+| **M2B — opt-in live acceptance** | 明確 user authorization、有效 settings source／policy、正常 eligible subscription session | **NOT STARTED**：實際 renderer 保留／復原、被動 delivery、idle expiry 與帳號環境證據；仍 Experimental |
 | **M3 — provider/lifecycle** | 對 source age／failed/expired/unknown continuity 有明確產品 policy | 源失效 clear、coalescing／cancel／late completion、re-baseline；無 persistent Claude process |
 | **M4 — capability UI** | M3 允許顯示的 snapshot 及局限已成立 | setup/version/auth/source/expired 區別；pin 與 5H/W 正確；activity/reserve 不開；獨立 manual UI 驗收 |
 | **M5 — notifications** | **blocked**，須可信 source freshness 與足夠 continuity／安全 policy 實證；只有 epoch 不夠 | fake center 測試 + 正常使用中的有界 live acceptance；completed reset 另設更高 gate |
@@ -512,3 +513,125 @@ Reader missing → snapshotNotFound／awaitingSource／既有 notConfigured；EA
 Local commits 分為能力/安全 policy 與 quota/parser/reader foundation 兩個 coherent units；不 push。實際 SHAs 與 final clean status 記於聊天交付，避免文件自我引用 commit。**CLAUDE M0/M1 COMPLETE — READY FOR PASSIVE BRIDGE DESIGN**。
 
 M2 建議只開始 passive bridge design：人工 previewable/reversible composition、bounded stdin allowlist、owner-only atomic writer、觀察時間與上游 freshness 限制、source generation fencing；先驗證正常符合資格的訂閱 session 被動交付，再評估 M3／M4。通知仍須獨立 M5 證據，個人 Activity／Insights／Reserve 維持 unsupported。
+
+## 19. M2A — Passive bridge core（2026-10-05）
+
+本節為 M0／M1 後續的 **synthetic/non-live** 實作紀錄，優先於上方歷史段落的 M2 尚未開始敘述。M0 COMPLETE、M1 COMPLETE、M2A COMPLETE；M2B NOT STARTED、M3+ NOT STARTED。App 仍 **Experimental / Unverified**。
+
+### 19.1 Preflight 與 delivery decision
+
+- 起始 branch `feat/claude-provider-foundation`，HEAD `987dd080b8087a07c1ac1deb36fc4e7f16ee0d9d`，working tree clean。
+- `origin/main` `924df240b0311bb82c261692beae18204d8b94f7`；`origin/main...HEAD` 為 0 left／3 right；log 有 `e8e0152`、`f56a4de`、`987dd08`。沒有 fetch/rebase/push，也未假定 checkpoint 已在 remote。
+- Current project 使用 Xcode filesystem-synchronized App／hosted XCTest targets、Swift 6、complete concurrency、macOS 14 minimum；本輪 toolchain 為 Xcode 27.0。選 **A：小型 Swift command-line helper target**，App 以 dependency + CodeSignOnCopy 內嵌 `Contents/Helpers/ClaudeQuotaBridge`。
+
+| 方案 | 決策與理由 |
+| --- | --- |
+| A — Swift helper target | 採用。Parser／domain source 共用、獨立 scheme、App build 自動攜帶 helper；能對 executable 與 embedded product 分別驗證 |
+| B — opaque embedded executable | 封裝結果仍為 embedded executable，但不採外部 prebuilt blob；source／signing 與 project 同步維護 |
+| C — script around App binary | 不採用。無需啟動 SwiftUI App 或增加 early-launch dispatch；也避免 shell JSON parser |
+| D — package／其他機制 | 現有 project 已支援 tool target，無需增加 package/module／runtime dependency |
+
+Helper 與 App 共用 `ClaudeQuotaContract`、`ClaudeStatusLineInput`、`ClaudeSnapshotDTO`、reader／writer／bridge composition，以及必要的 pure ProviderID／capability types。`CLAUDE_BRIDGE` 只排除 App-specific error-to-status conformances；validation 不分叉。Setup preview 留在 App module，沒有 installer/UI。Debug／Release product 各自內嵌 tool；development derived-data path 不能當作 future installed path。未來選 stable App bundle path，App upgrades 原子更新 App 與 helper，搬移／刪除 App 時 setup 必須辨識失效並 rollback，不能靜默重寫 command。Developer ID／hardened-runtime／notarization 需對整個 bundle 另行驗證，本輪不是 distribution proof。**沒有安裝 helper**。
+
+### 19.2 Input／privacy／snapshot contract
+
+官方 [status-line](https://code.claude.com/docs/en/statusline) 定義 `version`、conditional `rate_limits` 與兩視窗欄位。本輪重新唯讀查核官方文件，未執行 Claude。
+
+| 邊界 | 實作 policy |
+| --- | --- |
+| stdin transport | 64 KiB strict bound，monotonic 2-second deadline，nonblocking descriptor + poll，讀到 EOF 才交付；不使用 readToEnd |
+| capture parser | 沿用 M1 16 KiB bound；invalid UTF-8／malformed JSON／wrong known types 形成固定 error，無 raw input echo |
+| headroom | 完整官方事件有 workspace／context／prompt-cache 等未知 metadata；16…64 KiB 可不 capture 但完整轉送 renderer。64 KiB 是保守產品 bound，不是官方最大大小保證 |
+| allowlist | `version`；`rate_limits.five_hour/seven_day.used_percentage/resets_at`。只有 canonical version、validated windows 與 local observedAt 進 projection |
+| discard | cwd、workspace／git／repo、transcript、session／prompt、model／conversation、cost、tokens、email／account／credential／unknown nested fields；不序列化、不留 logs |
+| output | 同一 M1 camelCase `ClaudeUsageSnapshotDocument` schemaVersion 1；`capturedAt` ISO8601、`claudeCodeVersion`、`rateLimits.fiveHour/sevenDay`。不新增第二種 quota format、不保存 raw rate_limits object |
+| default location | 既有 `~/Library/Application Support/QuotaPulse/Providers/Claude/usage-v1.json`，helper 明確 `--snapshot-file` 可供 synthetic/dev fixture；不是 settings/provider input 可控制的 path |
+
+原始 bytes 只短暫保存在單次 invocation 記憶體，供 downstream byte-identical stdin forwarding；QuotaMew projection 不保存它。Synthetic tests 以假 email/token/transcript/cwd/prompt/session/nested secret 驗證 output top-level keys 與不洩漏 errors。No-downstream mode 不輸出任何 renderer text；是否 user-facing 留待 M2B。
+
+### 19.3 Observation／generation／invalid event
+
+- **observedAt** 是收到完整 event 且 quota/version validation 成功後取的本機時間；不取 mtime、不取 upstream fetchedAt，不是 quota cycle start 或 login time。v1 ISO8601 儲存精度為秒；generation 可區分同秒內 replacement。
+- 重複同一 quota event 是新的本機 observation，可前進 observedAt，不證明 Anthropic 重新查詢上游、不代表 account continuity／reset completion。
+- Generation 選最小的 **atomic inode replacement marker**：reader 同一 pinned descriptor 的 device／inode／ctime。每次成功 delivery 換 inode，重讀同檔不換 generation。它只在目前 source lifecycle 中使用，不寫入 v1、不建立 permanent identifier，不拿來證明帳號／cycle；M3 lifecycle wiring 尚未開始。Filesystem marker 不是對抗同 UID 惡意 actor 的 authenticity protocol。
+- `rate_limits` missing/null、兩視窗都 missing/null 或無有效 quota/reset fields → `noRateLimits`，**選 B：不 replace 舊檔**。Last snapshot 保持原 observedAt 並按既有 >15-minute age／expired reset stale；不讓無 quota event 將舊 limits 變新。Gateway spend-only 亦不 capture。
+- 單一視窗有效時寫只含該視窗的 snapshot，另一窗不補 0、不沿用舊窗。Expired reset 是有效歷史報告，保留實際 percentage/reset 並由 M1 標 stale，不推算重設。
+- Malformed／invalid quota／version／write failure → 固定 typed result，舊檔完整保留、不刷新 observedAt；不新增 competing invalidation marker。這保留 M1 unknown account continuity 的限制，不能判定即時帳號切換；讀取時不把 last-known sample 包裝為 upstream fresh。
+- M1 version gates 完整沿用：missing／malformed → unverifiedVersion；<2.1.80 → unsupportedVersion；已知可支援版本／future version 均仍須相同完整 schema/field validation。版本不是 authentication／live success 證據。
+
+### 19.4 Atomic writer／path security
+
+`ClaudeSnapshotWriter` 從 `/` descriptor openat 逐層走訪，O_DIRECTORY／O_NOFOLLOW／CLOEXEC；不先 string-check 再 unrelated open。Ancestor 必須 root／same effective UID，拒絕 group/other writable；root-owned sticky temporary ancestors 支援 synthetic fixtures。Missing directories mkdirat 0700，最終 provider directory same UID／0700；既有 mode 不安全則拒絕，不擅自 chmod。Leaf fstatat AT_SYMLINK_NOFOLLOW 檢查 regular、same UID、0600、single hard link；拒絕 symlink、FIFO、directory、hardlink、其他 owner/mode。
+
+Final-directory nonblocking flock 避免 cooperating concurrent writers 重疊；busy 回安全 write failure。Unique exclusive same-directory temp file 0600 → complete checked write loop → fsync file → cancellation + leaf revalidation → renameat atomic replacement → fsync parent。Owned descriptors 全 defer close；每個 precommit failure／cooperative cancellation cleanup temp；final 不 truncate。Parent fsync 在 rename 後失敗時結果為 writeFailed，但已 committed 的 final 仍完整，只是 durability 未確認；不聲稱 rollback。
+
+Synthetic tests 覆蓋 pinned old inode/new inode、temp cleanup/no-partial-final、leaf symlink 在 commit 前插入、ancestor rename 後不 redirect 至替代目錄、permissions／synthetic wrong owner、FIFO/hardlink、8 concurrent writers（成功或 busy）、cooperative cancellation。目錄被同 UID 搬移時會寫到已 pinned 目錄，不能宣稱 requested path 永遠存在。Same UID malicious process、SIGKILL／power loss、network filesystem semantics 不在本輪證據；OS kill -9 無法執行 defer cleanup，可能留下 owner-only temp，但不產生 partially truncated final。UUID 只用 temporary basename，不是帳號或 source identity。
+
+### 19.5 Existing renderer composition／trust／exit behavior
+
+**不執行、不讀取、不記錄使用者真實 renderer command。** 本輪只用 caller-provided synthetic `/bin/cat`、printf／exit／sleep 等測試。
+
+Future preview 應保存既有 renderer 為 opaque local command reference，helper 先 read stdin 一次／capture，再用 posix_spawn fixed executable／argv 把同一原始 Data pump 至 renderer stdin；不 reserialize JSON。Structured executable + argv 可直接使用；對 Claude 本來就是 shell-string 的 `statusLine.command`，採固定 `/bin/sh -c <original user-authored string>`，reference 可含使用者自己原有 shell syntax。Provider-controlled data 永遠不進 argv／shell source。Reference 必須 setup-owner 提供、regular／same UID／0600、有界 8 KiB、no-follow open，invalid reference 不啟動任意 fallback command。
+
+stdout pump 逐 chunk 原樣送出；不加 debug text，capture silent。stderr 丟到 `/dev/null`，不回傳 renderer/private error body。Invocation resource bound 為 renderer 2 秒／stdout 64 KiB；timeout／oversize 可已有 partial renderer output，但分類與退出碼固定。M2B 必須驗證現有 renderer 在 bounds 內；不宣稱任何任意 command 都相容。超過 64 KiB stdin 或未在 2 秒內 EOF，無完整 event 可轉送，因此不啟動 renderer；capture 16 KiB overflow 的完整 bounded event則仍可成功 render。
+
+| Capture | Downstream | stdout／snapshot／exit |
+| --- | --- | --- |
+| 成功 | 成功 | exact renderer stdout；保留新 snapshot；exit 0 |
+| invalid/no quota/write failed | 成功 | exact renderer stdout；既有 snapshot不 renew；exit 0 |
+| 成功 | exit nonzero／signal | renderer 已輸出 bytes 保留；新 snapshot 保留；exit downstream code／128+signal |
+| 任意 | launch failed／timeout／output bound／I/O／cancel | 已輸出 bytes 保留；127／124／125／125／130；無 raw diagnostic |
+| captured／noRateLimits | 無 downstream | 無 stdout；exit 0 |
+| unverified／unsupported version | 無 downstream | 無 stdout；exit 2 |
+| invalid input/quota／oversize／timeout | 無 downstream | 無 stdout；exit 3 |
+| write failure／cancel | 無 downstream | 無 stdout；exit 4／130 |
+
+Internal `ClaudeBridgeCaptureResult`、`ClaudeBridgeDownstreamResult`、`ClaudeBridgeExecutionResult` 僅含 enum／generation／exit status，沒有 raw JSON、private path、stderr 或 credentials。CLI configuration error 為 64。Downstream 專屬 process group 在 exit/timeout/cancel 清除、direct child reap，所有 pipes close；simultaneous read/write 避免 renderer 先 stdout 再 stdin 的 deadlock。沒有 bridge HTTP/auth client、persistent Claude process、general status-line rendering、timer/background polling 或 transcript I/O。
+
+### 19.6 Preview／rollback／managed settings
+
+`ClaudeBridgeSetupPreview` 處理 supplied synthetic settings bytes，保留 existing statusLine extra keys／original command，產生 quote 過的 helper/ref path，只改 `statusLine.command`；原先 absent 則明列 `statusLine.type` + `statusLine.command`。Has-existing-renderer 與 proposed integration 可顯示，但 private original command 不進 reports/logs。本輪沒有 settings reader/writer 或 backup persistence。
+
+Synthetic `rollback(currentSettings:)` 只在 current 與 installed proposal 完全相同時返回 original bytes，測試證明原格式/newlines 逐 byte 還原。Conflict 則拒絕，不覆蓋 user 後續修改。Future M2B 不應持久化整份 settings：最小 durable backup 為 exact original statusLine value／absent marker、原 opaque command、installed statusLine reference，owner-only 0700/0600，不可 commit/log/upload，rollback 後移除 reference。Original command 可能包含 private paths/inline secrets，因此這項 future local storage 必須在 preview 中明示，且需要 explicit user authorization。其他 settings key 應保持當時值，不用舊全檔 backup 猜測還原；衝突需明確處理。
+
+官方 [settings precedence](https://code.claude.com/docs/en/settings#settings-precedence)：managed > CLI > project-local > shared-project > user。官方 [statusLine settings reference](https://code.claude.com/docs/en/settings-reference#statusline)（本輪從官方 Markdown bounded read 查核）允許 Any file；`allowManagedHooksOnly`，或 outside-managed `disableAllHooks`，會限制只執行 managed statusLine。`ClaudeStatusLineSettingsEvidence` 以 supplied effective source、完整 sources/trust evidence 與這兩項 policy 判定：
+
+| State | 未來 user-level setup policy |
+| --- | --- |
+| editable | source user／absent，sources/trust 完整、兩個 restriction 明確 false；可提出 preview，仍須 user opt-in |
+| shadowed | effective source project-local／shared-project／CLI；不假稱 user-level edit 會生效 |
+| managed | effective managed source 或上述 execution restrictions；不提出繞過政策的 activation |
+| unknown | effective source、trust／config-directory／settings inventory 或 policy 不完整；不推論 editable |
+
+沒有檢查實際 managed/project/user 設定，也沒有取得 private command。`CLAUDE_CONFIG_DIR`、settings sources/trust 實際生效與 managed policy需 M2B 授權後確認；不能僅找到 user settings 檔就聲稱它是 active source。
+
+### 19.7 Validation／scope／M2B gate
+
+新增 `ClaudePassiveBridgeTests`，所有 quota與 command fixtures 合成；helper integration tests 使用 `--snapshot-file` 指向 ephemeral `/private/tmp/quotamew-m2a-*`，不寫 personal default snapshot。App normal build 會攜帶 helper但 runtime 不要求已配置；沒有 AppDependencies/launch auto-setup、background probe、polling 或 capability expansion。
+
+Validation counts／paths 在 final run 完成後記錄於下表；不把 build/test pass 當 live account、notification、manual UI、notarization 或 production performance 證據。
+
+| Validation | Result |
+| --- | --- |
+| Bridge tests | **38 passed／0 failed／0 skipped**，包含於 final scoped Claude run；最初獨立 bridge run 的 32 tests 也通過，之後新增 6 cases 由 final scoped/full runs 驗證 |
+| All Claude/foundation tests | **83 passed／0 failed／0 skipped**；`/private/tmp/quotamew-m2a-claude-verified.xcresult`，包含 M0 capability、M1 parser/reader/diagnostic/provider 與 M2A bridge |
+| Full deterministic XCTest | **556 tests：549 passed／0 failed／7 expected opt-in skips**；`/private/tmp/quotamew-m2a-full-verified.xcresult`，summary 確認非零 executed count；2 筆 QoS priority-inversion runtime warnings，如實保留，不擴大修改 transport |
+| Full skips | ActivityServiceLive、ActivityModelLive、CodexProvider live、CodexTokenActivitySource live、ActivityWindowLive、NotificationService live delivery、bounded synthetic reconnect resources |
+| Clean Debug／Release App builds | 各自獨立 derived data、clean build **exit 0**；quiet logs 無 compiler warning/error；不是 production signing/notarization/performance acceptance |
+| Explicit helper Debug／Release builds | `ClaudeQuotaBridge` scheme 各自 clean build **exit 0**，quiet logs 無 compiler warning/error；hosted XCTest 執行實際 bundled helper，tool target 不另建重複 test target |
+| Helper synthetic execution | Debug／Release embedded helper 各 **7 CLI scenarios passed**：capture/privacy/mode、malformed、unsupported version、transport oversize、exact cat composition、capture oversize 仍 render、不安全 command mode；全部明確 temp snapshot override |
+| Signature verification | built Debug／Release App 與 Release embedded helper 的 `codesign --verify --strict` 通過；只有本機 build signature 結構檢查，不等同 Developer ID、公證或 public artifact 驗證 |
+| git diff --check | **passed**；explicit staging 後另執行 cached check |
+
+Clean App logs／derived data 為 `/private/tmp/quotamew-m2a-clean-debug*`、`/private/tmp/quotamew-m2a-clean-release*`；helper 為 `/private/tmp/quotamew-m2a-helper-debug*`／`helper-release*`。XCTest-instrumented helper 產生的 `default.profraw` 已辨識為 LLVM coverage artifact，移出 checkout 至 `/private/tmp/quotamew-m2a-test-helper.profraw`，不 commit。測試產物不包含 live Claude payload。
+
+無 localization changes；文件變更僅本文件與 ARCHITECTURE.md。App 0.3.0/build 6、test metadata、beta.1 peeled commit `87485c2e1ac65c90718a091cb2e521d8443519b3` 不變。無 website/release artifact edits。Claude settings（home 與 repo）、登入/登出／帳號、credentials／transcripts/history、Claude prompts、undocumented quota HTTP endpoints 全未觸及。無 real/private quota snapshot；notifications 仍 M5 gated，Account Activity／Insights／Reserve unsupported。
+
+**M2B core gate ready**：deterministic boundary/composition/rollback/privacy 與 App/helper builds 都須通過下表 final results。M2B 仍需獨立 user authorization；本輪不啟用、不代替 authorization。下一階段尚需：
+
+1. 授權後確認 effective settings source／config-directory／trust／managed restrictions，提出 exact keys／helper path／owner-only reference storage／rollback preview；不要輸出 private command。
+2. 在正常 eligible authenticated Pro/Max session 被動收到官方 event；不發測試 prompt、不查 credentials、不要求為測試換帳號。需驗證安裝版本/schema／conditional fields；未登入或不符合資格時如實等待。
+3. 既有 renderer 的實際 bytes/output/exit/environment/cwd compatibility、2 秒／64 KiB bounds、helper bundle搬移／upgrade behavior；只保留 sanitized evidence。
+4. 經 user-approved reversible setup 驗證 original statusLine exact rollback、conflict handling、reference cleanup；不以刪除 statusLine 取代還原。
+5. 個人 snapshot安全 metadata、passive observedAt、duplicate event／missing／idle expiry／failure behavior與 App reader interoperability。不能由 generation 推論 account/reset continuity；M3/M4 仍需分開驗收。
+6. Production resource profiling與 Developer ID/notarization 為另外的 gates；M5 notifications 與 Activity/Insights/Reserve 不由 M2B 自動授權或開啟。

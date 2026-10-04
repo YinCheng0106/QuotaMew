@@ -235,7 +235,7 @@ Runtime 持有唯一 `@Observable @MainActor ActivityModel`，只依 service + p
 
 ### M0／M1 non-live foundation（2026-10-05）
 
-M0／M1 已實作；M2 尚未開始，Claude 仍為 **Experimental / Unverified**。`ProviderCapabilities` 是 UI-independent 的 domain policy：`ProviderCapabilitySupport`（supported／conditional／unsupported／unverified）、`ProviderRuntimeAvailability`（available／unknown／typed unavailable reason）、`ProviderCapabilityEnablement`（provider 與 feature consent）各自獨立，只有合併評估才形成可用資格。Codex 既有 quota、reset display／notifications、Account Activity、Activity Insights 與 Reserve 支援保持不變；broad auth diagnostic 為 unverified，不新增 Codex auth 推論。Claude quota、reset display 與 broad auth 為 conditional，其餘為 unsupported，通知直到 M5 才能重新評估。
+M0／M1 已實作；M2A passive bridge core 已完成 synthetic 驗證，M2B opt-in live acceptance 尚未開始，Claude 仍為 **Experimental / Unverified**。`ProviderCapabilities` 是 UI-independent 的 domain policy：`ProviderCapabilitySupport`（supported／conditional／unsupported／unverified）、`ProviderRuntimeAvailability`（available／unknown／typed unavailable reason）、`ProviderCapabilityEnablement`（provider 與 feature consent）各自獨立，只有合併評估才形成可用資格。Codex 既有 quota、reset display／notifications、Account Activity、Activity Insights 與 Reserve 支援保持不變；broad auth diagnostic 為 unverified，不新增 Codex auth 推論。Claude quota、reset display 與 broad auth 為 conditional，其餘為 unsupported，通知直到 M5 才能重新評估。
 
 純值依賴方向為 `ClaudeStatusLineInput` snake_case allowlist → `ClaudeQuotaValidation` → `ClaudeValidatedQuotaSample` → 自有 `ClaudeUsageSnapshotDocument`／既有 `UsageProvider` normalization。官方原始輸入與 camelCase `usage-v1.json` 不是相同 schema。只模型化 five_hour／seven_day；unknown、gateway spend、cost、model、workspace、prompt、transcript、credentials 等不進 normalized output，decode errors 收斂為固定 enum，無 raw payload/error logging。
 
@@ -246,6 +246,24 @@ M0／M1 已實作；M2 尚未開始，Claude 仍為 **Experimental / Unverified*
 Claude source 失效／invalid snapshot／停用會清除 AppModel cached sample；Codex 既有 cache policy 保留。`ResetNotificationPolicy`、`LocalResetDetector` 與 `NotificationService` 都以 capability gate 排除 Claude，清除其 baseline／dedup，啟動時取消舊 Claude pending requests。單靠百分比與 reset timestamp 不授予通知資格。Activity runtime 仍只註冊 `CodexTokenActivitySource`；Settings 的 activity consent 另受 capability policy 限制，沒有 Claude Activity／Insights／Reserve fallback。
 
 `ClaudeInstallationLocator` 只有 supplied bounded candidates + injectable probes 的純選擇流程，優先 usable native，再考慮 npm；沒有 production filesystem inventory／CLI probe。`ClaudeAuthDiagnostic` 只有 injectable runner／fixed auth status argv、stdout/stderr bounds、timeout／stdin-close request 契約與 allowlisted loggedIn + exit-code parser。Production process termination／reap／pipe cleanup implementation 留在後續里程碑；本輪 fake tests 不構成 OS process cleanup 或 live auth 證明，quota refresh 不呼叫它。
+
+### M2A — Passive bridge core（2026-10-05，synthetic only）
+
+新增 Swift 6 command-line target `ClaudeQuotaBridge`，以相同 source files 重用 M1 parser／validation／v1 DTO；`CLAUDE_BRIDGE` 只排除 App-specific error conformances，不分叉資料契約。App target 依賴 helper 並以 CodeSignOnCopy 放入 `Contents/Helpers/ClaudeQuotaBridge`。它是 one-shot stdio tool，App runtime 不啟動、不探測、不安裝 bridge，也不改 Claude settings。Development／Release 各自能建置同一 helper；Developer ID、公證與 stable installed path 驗收留在未來 distribution／M2B gates。
+
+`ClaudeBridgeInput` 以 monotonic deadline + nonblocking descriptor／poll 收取一次 stdin：完整 transport 上限 64 KiB、2 秒，EOF 才交付；M1 parser 的 capture limit 仍為 16 KiB。16…64 KiB 的事件可以捕捉失敗但仍 byte-identical 轉交 renderer；超過 transport bound 或未收到完整 EOF 不啟動 renderer、不寫 snapshot。官方結構包含許多不需要的 metadata，因此保留 transport headroom；上限是產品安全限制，不是 Anthropic 保證。UTF-8／JSON／version／quota 驗證錯誤只形成固定分類，原始 bytes 僅在 invocation 記憶體中供 downstream 使用。
+
+成功 validation 後取得本機 observedAt，透過 M1 `snapshotDocument()` 寫入既有 `QuotaPulse/Providers/Claude/usage-v1.json`；只含 schemaVersion、capturedAt、canonical Claude version 與兩個 allowlisted quota windows。重複事件是新本機 observation；不代表 upstream query、帳號延續或 completed reset。Missing/null／both absent／empty windows 不寫入、不刷新舊 observedAt；invalid event 亦保留舊檔直到原 15 分鐘／reset-expiry stale policy 生效。單一視窗僅保存該視窗，expired reset 保留原值並維持 stale。
+
+`ClaudeSnapshotWriter` 從 root descriptor 以 openat／O_NOFOLLOW 逐層開啟目錄；祖先需 root／same UID 且非 group/other writable，root-owned sticky temporary ancestor 可供 synthetic fixture。缺目錄以 0700 建立，最終目錄要求 same UID／0700，不自動 chmod 既有不合規目錄。Leaf 必須 regular／same UID／0600／single-link，拒絕 symlink／FIFO／hardlink。以 final-directory nonblocking flock 排除同時 writer；busy 是安全 write failure，不阻礙 renderer。Same-directory exclusive temp 0600、完整 write loop、fsync file、commit 前再驗 leaf／取消、renameat、fsync parent；失敗／cooperative cancellation 清 temp，不 truncate final。Rename 後 fsync failure 是完整檔案但 durability 未確認，不能假稱未 commit。同 UID malicious process／kill -9／power-loss durability 不由這些 tests 證明。
+
+Atomic replacement 的 device／inode／ctime 為 ephemeral source generation；reader `readObservation()` 從同一 pinned descriptor 回傳 generation 與 v1 document。重讀相同 inode 不產生新 delivery；新 bridge replacement 產生新 generation，即使 quota 相同。標記不序列化、不跨 source lifecycle 持久化、不當 account/reset-cycle identity；M3 尚未接入 App lifecycle。
+
+`ClaudeBridgeComposition` 以 posix_spawn 建立獨立 downstream process group，並行 pump 原始 stdin 與 stdout，避免 pipe deadlock。Structured executable／argv 用於測試；future 原 renderer command 保留為 opaque local owner-only reference，由固定 `/bin/sh -c` 解譯，不將 provider bytes 插入 shell syntax。Downstream stdout 在 64 KiB／2 秒內原樣轉送，stderr 丟棄，bridge 不加 stdout／raw diagnostics。Capture/write failure + renderer success 回 exit 0；capture success + renderer failure 保留 snapshot 與已輸出內容、回 renderer exit；launch／timeout／output-bound failure 為 127／124／125。Owned pipes 在所有 paths 關閉；timeout／cancel 清專屬 process group 並 reap direct child。這是 invocation 內事件式 I/O wait，沒有 background timer、network、provider process、polling schedule 或 history。
+
+`ClaudeBridgeSetupPreview` 僅處理 caller-supplied synthetic settings，顯示 existing／absent、changed keys、helper／reference paths、editable／shadowed／managed／unknown。保留既有 renderer command／statusLine 額外 keys，不執行 real command、不持久化 preview。Synthetic rollback 返回逐 byte 相同的原設定；current settings 與 installed proposal 不同時拒絕盲目 rollback。Future M2B 最小 durable backup 為原 statusLine 的 exact value／absent marker、opaque command reference 與 installed-value reference，均需 owner-only、不可 log/export；不備份 credentials 或整份 Claude 設定。Managed precedence 與 `allowManagedHooksOnly`／outside-managed `disableAllHooks` 可以阻止 user integration；higher-priority source 為 shadowed，sources/trust/policy 證據不足為 unknown。沒有 real settings scanner 或 mutation API。
+
+完整 synthetic matrix、build/test counts、限制與 live gates 見 [Claude foundation §19](docs/CLAUDE_PROVIDER_FOUNDATION.md#19-m2a--passive-bridge-core2026-10-05)。M0／M1／M2A complete；M2B／M3+ not started。Claude notifications 在 M5 前 gated；Activity／Insights／Reserve 仍 unsupported。
 
 ### 優先方案：有文件的 status-line JSON 與 opt-in bridge
 
