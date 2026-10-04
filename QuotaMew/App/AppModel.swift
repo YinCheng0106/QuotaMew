@@ -154,7 +154,8 @@ final class AppModel {
         }
 
         if let index = providerStates.firstIndex(where: { $0.providerID == providerID }) {
-            let snapshot = providerStates[index].snapshot
+            let snapshot = providerID.capabilities.retainsUnavailableQuotaSample
+                ? providerStates[index].snapshot : nil
             providerStates[index] = isEnabled
                 ? .loading(providerID)
                 : ProviderState(providerID: providerID, status: .disabled, snapshot: snapshot)
@@ -317,6 +318,7 @@ final class AppModel {
         }
         let displayStates = eligibleStates.map { state in
             guard state.snapshot == nil,
+                  state.providerID.capabilities.retainsUnavailableQuotaSample,
                   let cachedSnapshot = cachedSnapshots[state.providerID]
             else {
                 return state

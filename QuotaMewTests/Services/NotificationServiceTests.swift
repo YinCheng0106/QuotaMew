@@ -6,6 +6,18 @@ import UserNotifications
 final class NotificationServiceTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 2_000_000_000)
 
+    func testClaudeManualSnapshotNeverCreatesReminderOrCompletedResetBaseline() async {
+        let (service, center, store) = makeService()
+        await service.evaluate([makeState(providerID: .claude, resetAfter: 60, usedPercentage: 80)], now: now)
+        let next = now.addingTimeInterval(90)
+        await service.evaluate([makeState(providerID: .claude, resetAt: next.addingTimeInterval(18_000),
+            usedPercentage: 0, capturedAt: next)], now: next)
+        XCTAssertTrue(center.requests.isEmpty)
+        XCTAssertEqual(center.authorizationRequestCount, 0)
+        XCTAssertTrue(store.state.entries.isEmpty)
+        XCTAssertTrue(store.loadLocalResetDetectionState().entries.isEmpty)
+    }
+
     func testReserveDoesNotSendRemindersCompletedResetsOrRequestPermission() async {
         for bucket in ["base_model_inference", "gpt-reserve"] {
             let (service, center, store) = makeService(status: .notDetermined)
@@ -307,8 +319,8 @@ final class NotificationServiceTests: XCTestCase {
         service.prepareForLaunch()
         await center.waitForRemovalCount(1)
 
-        XCTAssertEqual(center.pendingIdentifiers, [claudeIdentifier])
-        XCTAssertEqual(center.removedIdentifiers, [[codexIdentifier]])
+        XCTAssertTrue(center.pendingIdentifiers.isEmpty)
+        XCTAssertEqual(center.removedIdentifiers, [[codexIdentifier, claudeIdentifier]])
     }
 
     func testRestartUsesPersistedLifecycleGenerationToRemoveStalePendingRequest() async {
@@ -373,8 +385,8 @@ final class NotificationServiceTests: XCTestCase {
         )
         await relaunchedService.evaluate([], now: now)
 
-        XCTAssertEqual(center.pendingIdentifiers, [currentClaudeIdentifier])
-        XCTAssertEqual(center.removedIdentifiers.last, [staleCodexIdentifier])
+        XCTAssertTrue(center.pendingIdentifiers.isEmpty)
+        XCTAssertEqual(center.removedIdentifiers.last, [staleCodexIdentifier, currentClaudeIdentifier])
     }
 
     func testGenuineLocalResetEmitsOneLocalizedCompletedNotification() async throws {
@@ -698,7 +710,7 @@ final class NotificationServiceTests: XCTestCase {
         XCTAssertEqual(center.authorizationRequestCount, 0)
     }
 
-    func testDisabledProviderSchedulesNoNotificationWhileAnotherProviderStillDoes() async {
+    func testDisabledCodexDoesNotGiveClaudeNotificationEntitlement() async {
         let suiteName = "dev.quotapulse.tests.notifications.provider-disabled.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -720,8 +732,7 @@ final class NotificationServiceTests: XCTestCase {
             now: now
         )
 
-        XCTAssertEqual(center.requests.count, 1)
-        XCTAssertEqual(center.requests.first?.title, "Claude Code Weekly quota resets in 6 hours")
+        XCTAssertTrue(center.requests.isEmpty)
     }
 
     func testDisablingProviderCancelsOnlyThatProvidersPendingQuotaRequests() async {
@@ -1070,7 +1081,7 @@ final class NotificationServiceTests: XCTestCase {
         XCTAssertEqual(center.requests.count, 1)
     }
 
-    func testOneProviderNotificationStateDoesNotAffectAnotherProvider() async {
+    func testUnsupportedClaudeCannotAffectCodexNotificationState() async {
         let (service, center, _) = makeService()
         let states = [
             makeState(providerID: .codex, windowID: "primary", resetAfter: 6 * 3_600),
@@ -1080,10 +1091,9 @@ final class NotificationServiceTests: XCTestCase {
         await service.evaluate(states, now: now)
         await service.evaluate(states, now: now.addingTimeInterval(60))
 
-        XCTAssertEqual(center.requests.count, 2)
+        XCTAssertEqual(center.requests.count, 1)
         XCTAssertEqual(Set(center.requests.map(\.title)), [
             "Codex Weekly quota resets in 6 hours",
-            "Claude Code Weekly quota resets in 6 hours",
         ])
     }
 

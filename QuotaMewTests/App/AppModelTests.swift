@@ -144,6 +144,39 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.lastUpdatedAt, capturedAt)
     }
 
+    func testClaudeFailureClearsCachedSampleWithUnknownContinuity() async {
+        let provider = SuccessfulThenFailingAppModelProvider(capturedAt: .now, id: .claude)
+        let model = AppModel(providerIDs: [.claude],
+            refreshCoordinator: RefreshCoordinator(usageService: UsageService(providers: [provider])),
+            notificationService: TestNotificationService(), observesLifecycle: false)
+        await model.refresh()
+        XCTAssertNotNil(model.providerStates.first?.snapshot)
+        await model.refresh()
+        XCTAssertEqual(model.providerStates.first?.status, .failed(.refreshFailed))
+        XCTAssertNil(model.providerStates.first?.snapshot)
+    }
+
+    func testClaudeDisableAndUnavailableSourceClearSample() async {
+        for failure in [ProviderStatus.notConfigured, .failed(.refreshFailed)] {
+            let provider = SuccessfulThenFailingAppModelProvider(capturedAt: .now, id: .claude, failureStatus: failure)
+            let model = AppModel(providerIDs: [.claude],
+                refreshCoordinator: RefreshCoordinator(usageService: UsageService(providers: [provider])),
+                notificationService: TestNotificationService(), observesLifecycle: false)
+            await model.refresh()
+            await model.refresh()
+            XCTAssertEqual(model.providerStates.first?.status, failure)
+            XCTAssertNil(model.providerStates.first?.snapshot)
+        }
+        let provider = SuccessfulThenFailingAppModelProvider(capturedAt: .now, id: .claude)
+        let model = AppModel(providerIDs: [.claude],
+            refreshCoordinator: RefreshCoordinator(usageService: UsageService(providers: [provider])),
+            notificationService: TestNotificationService(), observesLifecycle: false)
+        await model.refresh()
+        model.applyProviderEligibilityChange(.claude, isEnabled: false)
+        XCTAssertEqual(model.providerStates.first?.status, .disabled)
+        XCTAssertNil(model.providerStates.first?.snapshot)
+    }
+
     #if DEBUG
     func testUserTriggeredNotificationUsesInjectedService() async {
         let notificationService = TestNotificationService()
@@ -224,18 +257,21 @@ private struct FailingAppModelProvider: UsageProvider {
 }
 
 private actor SuccessfulThenFailingAppModelProvider: UsageProvider {
-    nonisolated let id = ProviderID.codex
+    nonisolated let id: ProviderID
     private let capturedAt: Date
     private var fetchCount = 0
+    private let failureStatus: ProviderStatus
 
-    init(capturedAt: Date) {
+    init(capturedAt: Date, id: ProviderID = .codex, failureStatus: ProviderStatus = .failed(.refreshFailed)) {
         self.capturedAt = capturedAt
+        self.id = id
+        self.failureStatus = failureStatus
     }
 
     func fetchUsage() async throws -> ProviderUsageSnapshot {
         fetchCount += 1
         guard fetchCount == 1 else {
-            throw AppModelProviderStatusError(providerStatus: .failed(.refreshFailed))
+            throw AppModelProviderStatusError(providerStatus: failureStatus)
         }
 
         return ProviderUsageSnapshot(

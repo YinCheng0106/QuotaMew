@@ -173,7 +173,7 @@ final class NotificationService: NotificationServicing {
         let generation = evaluationGeneration
         let notificationPreferences = preferences?.notificationPreferences ?? .defaults
         let enabledStates = providerStates.filter {
-            isProviderCurrentlyEnabled($0.providerID)
+            isProviderEligibleForNotifications($0.providerID)
         }
         let providerGenerations = Dictionary(
             uniqueKeysWithValues: enabledStates.map {
@@ -419,7 +419,7 @@ final class NotificationService: NotificationServicing {
             guard let providerID = quotaResetProviderID(from: identifier) else {
                 return false
             }
-            guard isProviderCurrentlyEnabled(providerID) else { return true }
+            guard isProviderEligibleForNotifications(providerID) else { return true }
             return !isIdentifierFromCurrentLifecycle(identifier, providerID: providerID)
         }
         if !identifiersToRemove.isEmpty {
@@ -456,10 +456,11 @@ final class NotificationService: NotificationServicing {
         providerLifecycleStates[providerID]?.generation ?? 0
     }
 
-    private func isProviderCurrentlyEnabled(_ providerID: ProviderID) -> Bool {
-        providerLifecycleStates[providerID]?.isEnabled
-            ?? preferences?.isProviderEnabled(providerID)
-            ?? true
+    private func isProviderEligibleForNotifications(_ providerID: ProviderID) -> Bool {
+        providerID.capabilities.support(for: .resetNotifications) == .supported
+            && (providerLifecycleStates[providerID]?.isEnabled
+                ?? preferences?.isProviderEnabled(providerID)
+                ?? true)
     }
 
     private func isCurrentLifecycle(
@@ -467,7 +468,7 @@ final class NotificationService: NotificationServicing {
         generation: UInt64?
     ) -> Bool {
         guard let generation else { return false }
-        return isProviderCurrentlyEnabled(providerID)
+        return isProviderEligibleForNotifications(providerID)
             && providerLifecycleGeneration(for: providerID) == generation
     }
 
@@ -479,7 +480,7 @@ final class NotificationService: NotificationServicing {
 
         let identifiersToRemove = identifiers.filter {
             guard isQuotaResetIdentifier($0, for: providerID) else { return false }
-            guard isProviderCurrentlyEnabled(providerID) else { return true }
+            guard isProviderEligibleForNotifications(providerID) else { return true }
             return !isIdentifierFromCurrentLifecycle($0, providerID: providerID)
         }
         if !identifiersToRemove.isEmpty {

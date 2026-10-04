@@ -170,7 +170,7 @@ final class LocalResetDetectorTests: XCTestCase {
         XCTAssertTrue(duplicate.resets.isEmpty)
     }
 
-    func testProviderIndependentDetectionKeepsProvidersSeparate() {
+    func testClaudeContinuityUnknownCannotEnterCodexResetDetection() {
         let oldReset = start.addingTimeInterval(60 * 60)
         let baseline = detector.evaluate(
             [
@@ -192,7 +192,8 @@ final class LocalResetDetectorTests: XCTestCase {
             now: afterCapture
         )
 
-        XCTAssertEqual(Set(evaluation.resets.map(\.identity.providerID)), [.codex, .claude])
+        XCTAssertEqual(Set(evaluation.resets.map(\.identity.providerID)), [.codex])
+        XCTAssertFalse(evaluation.state.entries.contains { $0.providerID == .claude })
     }
 
     func testTemporaryMissingResetTimestampDoesNotDestroyPriorEvidence() {

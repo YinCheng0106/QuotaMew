@@ -77,8 +77,10 @@ struct LocalResetDetector: Equatable, Sendable {
         var state = validState(from: originalState)
         var resets: [DetectedQuotaReset] = []
         var evaluatedKeys: Set<LocalResetDetectionState.Key> = []
+        state.entries.removeAll { $0.providerID.capabilities.support(for: .resetNotifications) != .supported }
 
         for providerState in providerStates {
+            guard providerState.providerID.capabilities.support(for: .resetNotifications) == .supported else { continue }
             guard providerState.status == .available else { continue }
             guard
                 let snapshot = providerState.snapshot,

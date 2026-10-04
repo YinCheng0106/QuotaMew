@@ -207,7 +207,8 @@ final class SettingsStore: AppPreferencesProviding {
     }
 
     func isActivityEnabled(_ providerID: ProviderID) -> Bool {
-        providerID == .codex && isCodexAccountActivityEnabled && isProviderEnabled(providerID)
+        providerID.capabilities.support(for: .accountActivity) == .supported
+            && isCodexAccountActivityEnabled && isProviderEnabled(providerID)
     }
 
     func setCodexAccountActivityEnabled(_ enabled: Bool) {
