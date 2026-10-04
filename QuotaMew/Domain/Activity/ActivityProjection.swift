@@ -36,6 +36,8 @@ struct ActivityProjection: Equatable, Sendable {
     let latestReported: ActivityBucket
     let sevenDays: ActivityWindowProjection
     let thirtyDays: ActivityWindowProjection
+    let sevenDayInsights: ActivityInsightsQuery
+    let thirtyDayInsights: ActivityInsightsQuery
     let capturedAt: Date
     let source: ActivitySource
 
@@ -67,6 +69,9 @@ struct ActivityProjection: Equatable, Sendable {
             )
         }
         return try Self(latestReported: latest, sevenDays: window(days: 7),
-                        thirtyDays: window(days: 30), capturedAt: snapshot.capturedAt, source: snapshot.source)
+                        thirtyDays: window(days: 30),
+                        sevenDayInsights: ActivityInsights.query(snapshot, period: .sevenDays),
+                        thirtyDayInsights: ActivityInsights.query(snapshot, period: .thirtyDays),
+                        capturedAt: snapshot.capturedAt, source: snapshot.source)
     }
 }

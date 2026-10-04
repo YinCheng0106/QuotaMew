@@ -90,6 +90,14 @@ Production `AppDependencies.makeRuntime()` 仍只建立一個 `CodexAppServerCli
 
 失去 connection continuity 只代表舊 Account Activity 不再有資格顯示，**不代表帳號已變更**；目前仍無隱私安全且穩定的帳號識別訊號，不能偵測所有外部靜默切換。重新顯示數值需在健康的新 connection 上由明確 Activity 互動成功擷取；Settings 僅持久化 consent Bool。M2／M3 段落保留當時實作狀態，以上為目前實作的後續修正。
 
+### Activity Insights foundation（2026-10-04，未發行）
+
+`ActivityInsights.query(snapshot, period:)` 是獨立純領域投影，只使用 current normalized memory snapshot 的每日 buckets。7D／30D 的每日回報平均以 reported days 為分母（含 explicit zero、排除 missing）；最高回報日只選已回報集合，包含零，同值選最新 source date 並保留 tie count。前期為緊接本期前方的同長度來源日期範圍，只有兩期日期涵蓋都完整才比較 totals。日期全回報仍不代表 provider values 最終、完整帳務或來源日已結束。
+
+Typed states 區分 available／noReportedData／insufficientCoverage／overflow／sourceDateOutOfRange。Sum／delta checked；平均取最接近整數、half 向上；percentage 用 full-width 整數運算，不足 1% 明確標示，零基期不造百分比。56 個連續日期不足以比較兩個 30D；不累積歷史或補零。純領域不依賴 UI、network、clock 或 persistence，既有 consent／transport／refresh lifecycle 不變。詳細候選取捨、contract revalidation 與測試矩陣見 [Activity Insights 設計](docs/ACTIVITY_INSIGHTS_FOUNDATION.md)。
+
+`ActivityProjection` 在同一 snapshot 的 query 中建立 7D／30D Insights，與既有日期投影一同發布到 ActivityModel；失效時一同消失。`ActivityInsightsPresentation` 使用既有 English／zh-Hant catalog 產生 exact number、分母、日期／並列與不可用原因。視窗在 Coverage 下方加入預設收合的原生「Activity Insights／活動洞察」，維持 420 minimum width，中性文字與 accessibility grouping；Latest 不新增洞察。沒有額外 refresh、timer、transport、persistence 或 quota changes。
+
 ### v0.2 Product Polish（2026-09-07，COMPLETE，尚未發行）
 
 額度名稱只有一個來源：`UsageWindowPresentation`。精確 duration 18,000 秒對應 `5-hour`／`5 小時`，604,800 秒對應 `Weekly`／`每週`，未知／缺少／無效 duration 使用通用名稱；不由 array position、primary/secondary 或倒數推論，也不把 raw provider label 顯示給使用者。Dashboard row、VoiceOver header 及 approaching/completed notification 文案都共用此 formatter；`UsagePresentation` 繼續只負責 Remaining／Used 百分比。Domain ID、label、duration、reset/cycle metadata 保持原值；`LocalResetDetector` 不參與本地化。

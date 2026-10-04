@@ -120,6 +120,9 @@ private struct ActivityReportView: View {
                     }
                 }
                 .accessibilityElement(children: .combine)
+                if let insights = presentation.insights {
+                    ActivityInsightsView(presentation: insights)
+                }
                 ActivityTrendView(points: presentation.points, period: presentation.period)
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel(presentation.summaryAccessibilityText)
@@ -141,6 +144,44 @@ private struct ActivityReportView: View {
             }
             Text(verbatim: presentation.sourceText).font(.caption).foregroundStyle(.secondary)
             Text(verbatim: presentation.fetchedText).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct ActivityInsightsView: View {
+    let presentation: ActivityInsightsPresentation
+
+    var body: some View {
+        DisclosureGroup("Activity Insights") {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Daily reported average").font(.headline)
+                    Text(verbatim: presentation.averageText).monospacedDigit()
+                }
+                .accessibilityElement(children: .combine)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Highest reported day").font(.headline)
+                    Text(verbatim: presentation.highestText).monospacedDigit()
+                    if let ties = presentation.highestTieText {
+                        Text(verbatim: ties).foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Compared with previous period").font(.headline)
+                    if let dates = presentation.previousDatesText {
+                        Text(verbatim: dates).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    }
+                    Text(verbatim: presentation.comparisonText)
+                }
+                .accessibilityElement(children: .combine)
+                Text("Average and highest day use reported dates only, including reported zero. The average is rounded to whole tokens. Complete date coverage does not mean values are final.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .contain)
+            .padding(.top, 8)
         }
     }
 }

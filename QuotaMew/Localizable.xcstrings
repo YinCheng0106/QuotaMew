@@ -1,6 +1,366 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Activity Insights" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity Insights"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活動洞察"
+          }
+        }
+      }
+    },
+    "Daily reported average" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daily reported average"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每日回報平均"
+          }
+        }
+      }
+    },
+    "Highest reported day" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Highest reported day"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最高回報日"
+          }
+        }
+      }
+    },
+    "Compared with previous period" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compared with previous period"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "與前一期間相比"
+          }
+        }
+      }
+    },
+    "Source dates are outside the supported range." : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source dates are outside the supported range."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "來源日期超出支援範圍。"
+          }
+        }
+      }
+    },
+    "Reported values are too large to summarize." : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported values are too large to summarize."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已回報數值過大，無法計算摘要。"
+          }
+        }
+      }
+    },
+    "Reported values are too large to compare." : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported values are too large to compare."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已回報數值過大，無法比較。"
+          }
+        }
+      }
+    },
+    "Reported total is unchanged from the previous period." : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported total is unchanged from the previous period."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已回報總量與前一期相同。"
+          }
+        }
+      }
+    },
+    "Reported total increased by less than 1% compared with the previous period." : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported total increased by less than 1% compared with the previous period."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已回報總量較前一期增加不到 1%。"
+          }
+        }
+      }
+    },
+    "Reported total decreased by less than 1% compared with the previous period." : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported total decreased by less than 1% compared with the previous period."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已回報總量較前一期減少不到 1%。"
+          }
+        }
+      }
+    },
+    "Average and highest day use reported dates only, including reported zero. The average is rounded to whole tokens. Complete date coverage does not mean values are final." : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Average and highest day use reported dates only, including reported zero. The average is rounded to whole tokens. Complete date coverage does not mean values are final."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平均與最高日僅以已回報日期計算，包含明確回報的零值。平均取最接近的整數 token。日期涵蓋完整不代表數值已確定。"
+          }
+        }
+      }
+    },
+    "activity.insights.average %@ %lld" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About %@ provider-reported tokens per reported date (reported dates: %lld)."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每個已回報日期約 %@ token（已回報 %lld 個日期）。"
+          }
+        }
+      }
+    },
+    "activity.insights.highest %@ %@" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: %@ provider-reported tokens."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：供應商回報 %@ token。"
+          }
+        }
+      }
+    },
+    "activity.insights.tied %lld" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld reported dates share the highest value; the latest source date is shown."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 個已回報日期並列最高，顯示最新的來源日期。"
+          }
+        }
+      }
+    },
+    "activity.insights.previous-dates %@ %@" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous source dates: %@ – %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前一期來源日期：%@ – %@"
+          }
+        }
+      }
+    },
+    "activity.insights.insufficient %lld %lld %lld %lld" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comparison unavailable: current period %lld of %lld dates reported; previous period %lld of %lld. Both periods require every date to be reported."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法比較：本期已回報 %lld／%lld 個日期，前一期已回報 %lld／%lld 個日期。兩期都需完整回報每個日期。"
+          }
+        }
+      }
+    },
+    "activity.insights.increased-percent %@" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported total increased by about %@ percent compared with the previous period."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已回報總量較前一期約增加 %@%%。"
+          }
+        }
+      }
+    },
+    "activity.insights.decreased-percent %@" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported total decreased by about %@ percent compared with the previous period."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已回報總量較前一期約減少 %@%%。"
+          }
+        }
+      }
+    },
+    "activity.insights.zero-baseline %@" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported total increased by %@ tokens. The previous reported total was zero, so a percentage comparison is unavailable."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已回報總量增加 %@ token。前一期已回報總量為零，因此無法計算百分比比較。"
+          }
+        }
+      }
+    },
+    "activity.insights.percentage-unavailable %@" : {
+      "extractionState": "manual",
+      "comment": "Activity Insights: provider-reported daily buckets only; no billing, quota, or productivity meaning.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reported total increased by %@ tokens. A percentage comparison is unavailable."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已回報總量增加 %@ token。無法計算百分比比較。"
+          }
+        }
+      }
+    },
     "Refresh" : {
       "extractionState": "manual",
       "localizations": {
